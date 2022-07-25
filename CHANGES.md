@@ -10,6 +10,10 @@ To be released.
 
 ### Backward-incompatible API changes
 
+ -  Added `IBlockPolicy<T>.NativeTokens` property.  [[#2149], [#2150], [#2175]]
+ -  Removed `ChainIdNotFoundException` class. [[#2047], [#2156]]
+ -  Added `IStore.GetCanonicalGenesisBlock(HashAlgorithmGetter)` method.
+    [[#2162], [#2171]]
  -  Added `LastCommit` property to `IBlockMetadata`.  [[#PBFT]]
  -  Added `IBlockPolicy.GetValidators()` method.  [[#PBFT]]
  -  (Libplanet.Net) Removed `SwarmOptions.StaticPeers`.  [[#PBFT]]
@@ -64,6 +68,21 @@ To be released.
 
 ### CLI tools
 
+[#1762]: https://github.com/planetarium/libplanet/issues/1762
+[#1972]: https://github.com/planetarium/libplanet/issues/1972
+[#2047]: https://github.com/planetarium/libplanet/issues/2047
+[#2140]: https://github.com/planetarium/libplanet/pull/2140
+[#2149]: https://github.com/planetarium/libplanet/issues/2149
+[#2150]: https://github.com/planetarium/libplanet/issues/2150
+[#2155]: https://github.com/planetarium/libplanet/issues/2155
+[#2156]: https://github.com/planetarium/libplanet/pull/2156
+[#2159]: https://github.com/planetarium/libplanet/pull/2159
+[#2162]: https://github.com/planetarium/libplanet/issues/2162
+[#2171]: https://github.com/planetarium/libplanet/pull/2171
+[#2173]: https://github.com/planetarium/libplanet/pull/2173
+[#2175]: https://github.com/planetarium/libplanet/issues/2175
+[#2179]: https://github.com/planetarium/libplanet/pull/2179
+[#2183]: https://github.com/planetarium/libplanet/pull/2183
 
 Version 0.40.0
 --------------
