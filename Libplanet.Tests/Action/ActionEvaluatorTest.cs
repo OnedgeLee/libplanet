@@ -79,12 +79,14 @@ namespace Libplanet.Tests.Action
                 transactions: txs
             );
             Block<RandomAction> stateRootBlock =
-                noStateRootBlock.Evaluate(GenesisMiner, null, stateStore);
+                noStateRootBlock.Evaluate(GenesisMiner, null, _ => true, stateStore);
             var actionEvaluator =
                 new ActionEvaluator<RandomAction>(
                     policyBlockAction: null,
                     blockChainStates: NullChainStates<RandomAction>.Instance,
-                    trieGetter: null);
+                    trieGetter: null,
+                    genesisHash: null,
+                    nativeTokenPredicate: _ => true);
             var generatedRandomNumbers = new List<int>();
 
             AssertPreEvaluationBlocksEqual(stateRootBlock, noStateRootBlock);
@@ -279,7 +281,10 @@ namespace Libplanet.Tests.Action
             ActionEvaluator<DumbAction> actionEvaluator = new ActionEvaluator<DumbAction>(
                 policyBlockAction: null,
                 blockChainStates: NullChainStates<DumbAction>.Instance,
-                trieGetter: null);
+                trieGetter: null,
+                genesisHash: null,
+                nativeTokenPredicate: _ => true
+            );
             IAccountStateDelta previousStates = genesis.ProtocolVersion > 0
                 ? new AccountStateDeltaImpl(
                     ActionEvaluator<DumbAction>.NullAccountStateGetter,
@@ -581,7 +586,9 @@ namespace Libplanet.Tests.Action
             var actionEvaluator = new ActionEvaluator<DumbAction>(
                 policyBlockAction: null,
                 blockChainStates: NullChainStates<DumbAction>.Instance,
-                trieGetter: null);
+                trieGetter: null,
+                genesisHash: tx.GenesisHash,
+                nativeTokenPredicate: _ => true);
 
             foreach (bool rehearsal in new[] { false, true })
             {
@@ -708,7 +715,10 @@ namespace Libplanet.Tests.Action
             var actionEvaluator = new ActionEvaluator<ThrowException>(
                 policyBlockAction: null,
                 blockChainStates: NullChainStates<ThrowException>.Instance,
-                trieGetter: null);
+                trieGetter: null,
+                genesisHash: tx.GenesisHash,
+                nativeTokenPredicate: _ => true
+            );
             var block = new BlockContent<ThrowException>
             {
                 Index = 123,
@@ -756,7 +766,9 @@ namespace Libplanet.Tests.Action
                 actions: txA.Actions.ToImmutableArray<IAction>(),
                 rehearsal: rehearsal,
                 previousBlockStatesTrie: fx.GetTrie(blockA.PreviousHash),
-                blockAction: false).ToArray();
+                blockAction: false,
+                nativeTokenPredicate: _ => true
+            ).ToArray();
 
             Assert.Equal(evalsA.Length, deltaA.Count - 1);
             for (int i = 0; i < evalsA.Length; i++)
@@ -805,7 +817,9 @@ namespace Libplanet.Tests.Action
                 actions: txB.Actions.ToImmutableArray<IAction>(),
                 rehearsal: rehearsal,
                 previousBlockStatesTrie: fx.GetTrie(blockB.PreviousHash),
-                blockAction: false).ToArray();
+                blockAction: false,
+                nativeTokenPredicate: _ => true
+            ).ToArray();
 
             Assert.Equal(evalsB.Length, deltaB.Count - 1);
 

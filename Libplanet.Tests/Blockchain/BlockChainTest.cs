@@ -626,7 +626,12 @@ namespace Libplanet.Tests.Blockchain
                     _policy.GetHashAlgorithm,
                     GenesisMiner.PublicKey,
                     transactions: new[] { _fx.MakeTransaction(new[] { action }) }
-                ).Evaluate(GenesisMiner, _policy.BlockAction, stateStore);
+                ).Evaluate(
+                    privateKey: GenesisMiner,
+                    blockAction: _policy.BlockAction,
+                    nativeTokenPredicate: _policy.NativeTokens.Contains,
+                    stateStore: stateStore
+                );
                 store.PutBlock(genesis);
                 var renderer = new RecordingActionRenderer<DumbAction>();
                 var blockChain = new BlockChain<DumbAction>(
@@ -1059,7 +1064,12 @@ namespace Libplanet.Tests.Blockchain
                     _policy.GetHashAlgorithm,
                     timestamp: DateTimeOffset.UtcNow,
                     miner: GenesisMiner.PublicKey
-                ).Evaluate(GenesisMiner, _policy.BlockAction, fx2.StateStore);
+                ).Evaluate(
+                    GenesisMiner,
+                    _policy.BlockAction,
+                    _policy.NativeTokens.Contains,
+                    fx2.StateStore
+                );
                 var chain2 = new BlockChain<DumbAction>(
                     _policy,
                     _stagePolicy,
@@ -1118,7 +1128,12 @@ namespace Libplanet.Tests.Blockchain
                         Array.Empty<DumbAction>()
                     ),
                 }
-            ).Evaluate(GenesisMiner, policy.BlockAction, stateStore);
+            ).Evaluate(
+                privateKey: GenesisMiner,
+                blockAction: policy.BlockAction,
+                nativeTokenPredicate: policy.NativeTokens.Contains,
+                stateStore: stateStore
+            );
             var chain = new BlockChain<DumbAction>(
                 policy,
                 new VolatileStagePolicy<DumbAction>(),
@@ -1701,7 +1716,12 @@ namespace Libplanet.Tests.Blockchain
             Block<DumbAction> genesisBlock = MineGenesis<DumbAction>(
                 blockPolicy.GetHashAlgorithm,
                 GenesisMiner.PublicKey
-            ).Evaluate(GenesisMiner, blockPolicy.BlockAction, stateStore);
+            ).Evaluate(
+                privateKey: GenesisMiner,
+                blockAction: blockPolicy.BlockAction,
+                nativeTokenPredicate: blockPolicy.NativeTokens.Contains,
+                stateStore: stateStore
+            );
             var chain = new BlockChain<DumbAction>(
                 blockPolicy,
                 new VolatileStagePolicy<DumbAction>(),
@@ -2005,7 +2025,12 @@ namespace Libplanet.Tests.Blockchain
                         Array.Empty<DumbAction>()
                     ),
                 }
-            ).Evaluate(GenesisMiner, policy.BlockAction, stateStore);
+            ).Evaluate(
+                privateKey: GenesisMiner,
+                blockAction: policy.BlockAction,
+                nativeTokenPredicate: policy.NativeTokens.Contains,
+                stateStore: stateStore
+            );
 
             Assert.Throws<TxPolicyViolationException>(() =>
             {
