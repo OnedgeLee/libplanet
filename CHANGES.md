@@ -73,6 +73,7 @@ To be released.
  -  (Libplanet.Net) Added
     `InvalidValidatorVoteMessageException` class.  [[#PBFT]]
  -  (Libplanet.Net) Added `Message.GetHash()` method.  [[#PBFT]]
+ -  Added `NonNativeTokenException` class.  [[#2149], [#2150], [#2175]]
  -  Added `BlockLocator` class. [[#1762], [#2140]]
  -  Added methods required for decoupling *Libplanet.Net* from
     *Libplanet*. [[#1762], [#2140]]
