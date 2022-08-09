@@ -57,7 +57,7 @@ namespace Libplanet.PoS
                 validator = new Validator((List)serializedValidator);
             }
 
-            BigInteger? issuedShareAmount = validator.GovTokenEquivShare(states, amount);
+            BigInteger? issuedShareAmount = validator.TokenEquivShare(states, amount);
             if (issuedShareAmount == null)
             {
                 throw new InvalidOperationException();

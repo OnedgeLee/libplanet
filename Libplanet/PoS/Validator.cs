@@ -57,22 +57,40 @@ namespace Libplanet.PoS
             return BondingStatus.Bonded;
         }
 
-        public BigInteger? GovTokenEquivShare(IAccountStateDelta states, BigInteger amount)
+        public BigInteger? TokenEquivShare(IAccountStateDelta states, BigInteger amount)
         {
-            BigInteger tokenAmount = states.GetBalance(Address, Asset.GovernanceToken).RawValue;
-            BigInteger shareAmount = states.GetBalance(Address, Asset.Share).RawValue;
-            if (shareAmount == 0)
+            FungibleAssetValue governanceToken = states.GetBalance(Address, Asset.GovernanceToken);
+            FungibleAssetValue share = states.GetBalance(Address, Asset.Share);
+            int logShareRawPerTokenRaw
+                = governanceToken.Currency.DecimalPlaces - share.Currency.DecimalPlaces;
+            if (share.RawValue == 0)
             {
                 return amount;
             }
 
-            if (tokenAmount == 0)
+            if (governanceToken.RawValue == 0)
             {
                 return null;
             }
 
-            BigInteger quo = BigInteger.DivRem(
-                BigInteger.Multiply(amount, shareAmount), tokenAmount, out BigInteger rem);
+            BigInteger quo;
+            if (logShareRawPerTokenRaw >= 0)
+            {
+                quo = BigInteger.DivRem(
+                    BigInteger.Multiply(
+                        share.RawValue, BigInteger.Pow(10, logShareRawPerTokenRaw)),
+                    BigInteger.Multiply(share.RawValue, amount),
+                    out BigInteger rem);
+            }
+            else
+            {
+                quo = BigInteger.DivRem(
+                    BigInteger.Multiply(share.RawValue, amount),
+                    BigInteger.Multiply(
+                        governanceToken.RawValue, BigInteger.Pow(10, -logShareRawPerTokenRaw)),
+                    out BigInteger rem);
+            }
+
             return quo;
         }
 
