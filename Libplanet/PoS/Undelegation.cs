@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Numerics;
 using Bencodex.Types;
 using Libplanet.Action;
+using Libplanet.Assets;
 
 namespace Libplanet.PoS
 {
@@ -40,6 +40,11 @@ namespace Libplanet.PoS
 
         public Address ValidatorAddress { get; }
 
+        public Address DelegationAddress
+        {
+            get => Delegation.DeriveAddress(DelegatorAddress, ValidatorAddress);
+        }
+
         public long UndelegationEntryIndex { get; set; }
 
         public SortedList<long, Address> UndelegationEntryAddresses { get; set; }
@@ -53,7 +58,7 @@ namespace Libplanet.PoS
         }
 
         public IAccountStateDelta Undelegate(
-            IAccountStateDelta states, BigInteger amount, long blockHeight)
+            IAccountStateDelta states, FungibleAssetValue share, long blockHeight)
         {
             // TODO: Failure condition
             // 1. Delegation does not exist
@@ -61,24 +66,89 @@ namespace Libplanet.PoS
             // 3. Delegation has less shares than worth of amount
             // 4. Existing undelegation has maximum entries
             // 5?. Delegation does not have sufficient token (fail or apply maximum)
-            UndelegationEntry undelegationEntry
-                = new UndelegationEntry(Address, amount, UndelegationEntryIndex, blockHeight);
-            UndelegationEntryAddresses.Add(
-                undelegationEntry.Index, undelegationEntry.Address);
+            if (!share.Currency.Equals(Asset.Share))
+            {
+                throw new ArgumentException();
+            }
+
+            if (share < states.GetBalance(DelegationAddress, Asset.Share))
+            {
+                throw new ArgumentException();
+            }
+
+            IValue? serializedValidator = states.GetState(ValidatorAddress);
+            Validator validator = (serializedValidator == null)
+                ? throw new InvalidOperationException()
+                : new Validator((List)serializedValidator);
+
+            states = states.BurnAsset(DelegationAddress, share);
+
+            FungibleAssetValue delegationShare = states.GetBalance(DelegationAddress, Asset.Share);
+            if (DelegatorAddress.Equals(validator.OperatorAddress)
+                && !validator.Jailed
+                && validator.GovernanceTokenFromShare(states, delegationShare)
+                < validator.MinSelfDelegation)
+            {
+                validator.Jailed = true;
+            }
+
+            validator.DelegatorShares -= share;
+
+            FungibleAssetValue? unbondingGovernanceToken
+                = validator.DelegatorShares == Asset.Share * 0
+                ? states.GetBalance(ValidatorAddress, Asset.GovernanceToken)
+                : validator.GovernanceTokenFromShare(states, share);
+
+            if (unbondingGovernanceToken == null)
+            {
+                throw new InvalidOperationException();
+            }
+
+            // Burn governance token on Cosmos
             states = states.TransferAsset(
                         ValidatorAddress,
-                        Pool.UnbondingPool,
-                        Asset.GovernanceToken * undelegationEntry.Amount);
+                        Pool.UnbondedPool,
+                        (FungibleAssetValue)unbondingGovernanceToken);
+
+            if (validator.GetBondingStatus(states) == BondingStatus.Bonded)
+            {
+                states = states.TransferAsset(
+                        Pool.BondedPool,
+                        Pool.UnbondedPool,
+                        Asset.NativeFromGovernance((FungibleAssetValue)unbondingGovernanceToken));
+            }
+
+            UndelegationEntry undelegationEntry = new UndelegationEntry(
+                    Address,
+                    (FungibleAssetValue)unbondingGovernanceToken,
+                    UndelegationEntryIndex,
+                    blockHeight);
+
+            UndelegationEntryAddresses.Add(
+                undelegationEntry.Index, undelegationEntry.Address);
+
             UndelegationEntryIndex += 1;
 
             // TODO: Global state indexing is also needed
+            states = states.SetState(ValidatorAddress, validator.Serialize());
             states = states.SetState(Address, Serialize());
             return states;
         }
 
         public IAccountStateDelta CancelUndelegation(
-            IAccountStateDelta states, BigInteger amount, long blockHeight)
+            IAccountStateDelta states,
+            FungibleAssetValue cancelledGovernanceToken,
+            long blockHeight)
         {
+            FungibleAssetValue cancellingGovernanceToken =
+                new FungibleAssetValue(
+                    Asset.GovernanceToken,
+                    cancelledGovernanceToken.MajorUnit,
+                    cancelledGovernanceToken.MinorUnit);
+            IValue? serializedValidator = states.GetState(ValidatorAddress);
+            Validator validator = (serializedValidator == null)
+                ? throw new InvalidOperationException()
+                : new Validator((List)serializedValidator);
             List<long> undelegationEntryIndices = new List<long>();
             foreach (KeyValuePair<long, Address> undelegationEntryAddressKV
                 in UndelegationEntryAddresses)
@@ -98,29 +168,60 @@ namespace Libplanet.PoS
                     break;
                 }
 
-                if (amount < undelegationEntry.Amount)
+                if (cancellingGovernanceToken < undelegationEntry.UnbondingGovernanceToken)
                 {
-                    if (amount > 0)
+                    if (cancellingGovernanceToken.RawValue > 0)
                     {
-                        undelegationEntry.Amount -= amount;
+                        undelegationEntry.UnbondingGovernanceToken -= cancellingGovernanceToken;
+                    }
+
+                    FungibleAssetValue? cancelledShare
+                        = validator.ShareFromGovernanceToken(states, cancelledGovernanceToken);
+                    if (cancelledShare == null)
+                    {
+                        throw new InvalidOperationException();
+                    }
+
+                    states = states.MintAsset(
+                        DelegationAddress, (FungibleAssetValue)cancelledShare);
+
+                    FungibleAssetValue delegationShare
+                        = states.GetBalance(DelegationAddress, Asset.Share);
+                    if (DelegatorAddress.Equals(validator.OperatorAddress)
+                        && validator.Jailed
+                        && validator.GovernanceTokenFromShare(states, delegationShare)
+                        >= validator.MinSelfDelegation)
+                    {
+                        validator.Jailed = false;
+                    }
+
+                    validator.DelegatorShares += (FungibleAssetValue)cancelledShare;
+
+                    states = states.TransferAsset(
+                        Pool.UnbondedPool,
+                        ValidatorAddress,
+                        cancelledGovernanceToken);
+
+                    if (validator.GetBondingStatus(states) == BondingStatus.Bonded)
+                    {
+                        states = states.TransferAsset(
+                                Pool.UnbondedPool,
+                                Pool.BondedPool,
+                                Asset.NativeFromGovernance(cancelledGovernanceToken));
                     }
 
                     undelegationEntryIndices.ForEach(
                         idx => UndelegationEntryAddresses.Remove(idx));
-
-                    states = states.TransferAsset(
-                        Pool.UnbondingPool,
-                        ValidatorAddress,
-                        Asset.GovernanceToken * undelegationEntry.Amount);
                     break;
                 }
                 else
                 {
-                    amount -= undelegationEntry.Amount;
+                    cancellingGovernanceToken -= undelegationEntry.UnbondingGovernanceToken;
                     undelegationEntryIndices.Add(undelegationEntry.Index);
                 }
             }
 
+            states = states.SetState(ValidatorAddress, validator.Serialize());
             states = states.SetState(Address, Serialize());
             return states;
         }
@@ -142,16 +243,17 @@ namespace Libplanet.PoS
 
                 UndelegationEntry undelegationEntry
                     = new UndelegationEntry((List)serializedUndelegationEntry);
+
                 if (undelegationEntry.IsMatured(blockHeight))
                 {
                     states = states.TransferAsset(
-                        Pool.BondedPool,
+                        Pool.UnbondedPool,
                         DelegatorAddress,
-                        Asset.NativeToken * undelegationEntry.Amount);
+                        Asset.NativeFromGovernance(undelegationEntry.UnbondingGovernanceToken));
 
                     states = states.BurnAsset(
-                        Pool.UnbondingPool,
-                        Asset.GovernanceToken * undelegationEntry.Amount);
+                        Pool.UnbondedPool,
+                        undelegationEntry.UnbondingGovernanceToken);
 
                     UndelegationEntryAddresses.Remove(undelegationEntry.Index);
                 }

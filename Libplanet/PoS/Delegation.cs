@@ -1,7 +1,7 @@
 using System;
-using System.Numerics;
 using Bencodex.Types;
 using Libplanet.Action;
+using Libplanet.Assets;
 
 namespace Libplanet.PoS
 {
@@ -13,7 +13,6 @@ namespace Libplanet.PoS
             Address = DeriveAddress(delegatorAddress, validatorAddress);
             DelegatorAddress = delegatorAddress;
             ValidatorAddress = validatorAddress;
-            Amount = 0;
         }
 
         public Delegation(List serialized)
@@ -21,7 +20,6 @@ namespace Libplanet.PoS
             Address = serialized[0].ToAddress();
             DelegatorAddress = serialized[1].ToAddress();
             ValidatorAddress = serialized[2].ToAddress();
-            Amount = serialized[3].ToLong();
         }
 
         public Address Address { get; }
@@ -30,8 +28,6 @@ namespace Libplanet.PoS
 
         public Address ValidatorAddress { get; }
 
-        public BigInteger Amount { get; set; }
-
         public static Address DeriveAddress(Address delegatorAddress, Address validatorAddress)
         {
             return delegatorAddress
@@ -39,66 +35,50 @@ namespace Libplanet.PoS
                 .Derive("Delegation");
         }
 
-        public IAccountStateDelta Delegate(IAccountStateDelta states, BigInteger amount)
+        public IAccountStateDelta Delegate(
+            IAccountStateDelta states, FungibleAssetValue nativeToken)
         {
             // TODO: Failure condition
             // 1. Validator does not exist
             // 2. Exchange rate is invalid(validator has no tokens but there are outstanding shares)
             // 3. Amount is less than the minimum amount
             // 4. Delegator does not have sufficient native token (fail or apply maximum)
-            Validator validator;
-            IValue? serializedValidator = states.GetState(ValidatorAddress);
-            if (serializedValidator == null)
+            if (!nativeToken.Currency.Equals(Asset.NativeToken))
             {
-                throw new InvalidOperationException();
-            }
-            else
-            {
-                validator = new Validator((List)serializedValidator);
+                throw new ArgumentException();
             }
 
-            BigInteger? issuedShareAmount = validator.TokenEquivShare(states, amount);
-            if (issuedShareAmount == null)
-            {
-                throw new InvalidOperationException();
-            }
+            FungibleAssetValue governanceToken = Asset.GovernanceFromNative(nativeToken);
+
+            IValue? serializedValidator = states.GetState(ValidatorAddress);
+            Validator validator = serializedValidator == null
+                ? throw new InvalidOperationException()
+                : new Validator((List)serializedValidator);
 
             // If validator share is zero, exchange rate is 1
             // Else, exchange rate is validator share / token
-            Assets.FungibleAssetValue issuedShare
-                = Asset.Share * (BigInteger)issuedShareAmount;
-
-            Address poolAddress;
-            switch (validator.Status)
+            FungibleAssetValue? issuedShare
+                = validator.ShareFromGovernanceToken(states, governanceToken);
+            if (issuedShare == null)
             {
-                case BondingStatus.Bonded:
-                    {
-                        poolAddress = Pool.BondedPool;
-                        break;
-                    }
-
-                case BondingStatus.Unbonding:
-                    {
-                        poolAddress = Pool.UnbondingPool;
-                        break;
-                    }
-
-                case BondingStatus.Unbonded:
-                    {
-                        poolAddress = Pool.UnbondedPool;
-                        break;
-                    }
-
-                default: throw new InvalidOperationException();
+                throw new InvalidOperationException();
             }
 
+            Address poolAddress = validator.GetBondingStatus(states) == BondingStatus.Bonded
+                ? Pool.BondedPool
+                : Pool.UnbondedPool;
+
             // Have to be failed from here if delegator does not have sufficient
+            // Native token : delegator -> pool
+            // Governance token : -> validator
+            // Share : -> delegation
             states = states.TransferAsset(
-                DelegatorAddress, poolAddress, Asset.NativeToken * amount);
-            states = states.MintAsset(Address, Asset.GovernanceToken * amount);
-            states = states.MintAsset(ValidatorAddress, issuedShare);
-            states = states.MintAsset(Address, issuedShare);
-            Amount += amount;
+                DelegatorAddress, poolAddress, Asset.NativeFromGovernance(governanceToken));
+            states = states.MintAsset(
+                ValidatorAddress, governanceToken);
+            states = states.MintAsset(Address, (FungibleAssetValue)issuedShare);
+            validator.DelegatorShares += (FungibleAssetValue)issuedShare;
+            states = states.SetState(ValidatorAddress, validator.Serialize());
             states = states.SetState(Address, Serialize());
             return states;
         }
@@ -108,8 +88,7 @@ namespace Libplanet.PoS
             return List.Empty
                 .Add(Address.Serialize())
                 .Add(DelegatorAddress.Serialize())
-                .Add(ValidatorAddress.Serialize())
-                .Add(Amount.Serialize());
+                .Add(ValidatorAddress.Serialize());
         }
     }
 }

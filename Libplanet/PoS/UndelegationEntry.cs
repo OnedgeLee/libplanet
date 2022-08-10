@@ -1,5 +1,5 @@
-using System.Numerics;
 using Bencodex.Types;
+using Libplanet.Assets;
 
 namespace Libplanet.PoS
 {
@@ -7,14 +7,14 @@ namespace Libplanet.PoS
     {
         public UndelegationEntry(
             Address undelegationAddress,
-            BigInteger amount,
+            FungibleAssetValue unbondingGovernanceToken,
             long index,
             long blockHeight,
             long boundBlockHeight = 50400 * 4)
         {
             Address = DeriveAddress(undelegationAddress, index);
             UndelegationAddress = undelegationAddress;
-            Amount = amount;
+            UnbondingGovernanceToken = unbondingGovernanceToken;
             Index = index;
             CompletionBlockHeight = blockHeight + boundBlockHeight;
         }
@@ -23,7 +23,7 @@ namespace Libplanet.PoS
         {
             Address = serialized[0].ToAddress();
             UndelegationAddress = serialized[1].ToAddress();
-            Amount = serialized[2].ToBigInteger();
+            UnbondingGovernanceToken = serialized[2].ToFungibleAssetValue();
             Index = serialized[3].ToLong();
             CompletionBlockHeight = serialized[4].ToLong();
         }
@@ -32,7 +32,7 @@ namespace Libplanet.PoS
 
         public Address UndelegationAddress { get; set; }
 
-        public BigInteger Amount { get; set; }
+        public FungibleAssetValue UnbondingGovernanceToken { get; set; }
 
         public long Index { get; set; }
 
@@ -50,7 +50,7 @@ namespace Libplanet.PoS
             return List.Empty
                 .Add(Address.Serialize())
                 .Add(UndelegationAddress.Serialize())
-                .Add(Amount.Serialize())
+                .Add(UnbondingGovernanceToken.Serialize())
                 .Add(Index.Serialize())
                 .Add(CompletionBlockHeight.Serialize());
         }

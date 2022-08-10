@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Numerics;
 using Bencodex.Types;
+using Libplanet.Assets;
 using Libplanet.PoS;
 
 namespace Libplanet.Action.Sys
@@ -13,13 +13,13 @@ namespace Libplanet.Action.Sys
     {
         public Address ValidatorAddress { get; set; }
 
-        public BigInteger Amount { get; set; }
+        public FungibleAssetValue CacncelledGovernanceToken { get; set; }
 
         protected override IImmutableDictionary<string, IValue> PlainValueInternal
             => new Dictionary<string, IValue>
         {
             ["ValidatorAddress"] = ValidatorAddress.Serialize(),
-            ["Amount"] = Amount.Serialize(),
+            ["CacncelledGovernanceToken"] = CacncelledGovernanceToken.Serialize(),
         }.ToImmutableDictionary();
 
         public override IAccountStateDelta Execute(IActionContext context)
@@ -41,7 +41,8 @@ namespace Libplanet.Action.Sys
                 undelegation = new Undelegation((List)serializedDelegation);
             }
 
-            states = undelegation.CancelUndelegation(states, Amount, ctx.BlockIndex);
+            states = undelegation.CancelUndelegation(
+                states, CacncelledGovernanceToken, ctx.BlockIndex);
 
             return states;
         }
@@ -50,7 +51,8 @@ namespace Libplanet.Action.Sys
             IImmutableDictionary<string, IValue> plainValue)
         {
             ValidatorAddress = plainValue["ValidatorAddress"].ToAddress();
-            Amount = plainValue["Amount"].ToBigInteger();
+            CacncelledGovernanceToken
+                = plainValue["CacncelledGovernanceToken"].ToFungibleAssetValue();
         }
     }
 }

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Numerics;
 using Bencodex.Types;
+using Libplanet.Assets;
 using Libplanet.PoS;
 
 namespace Libplanet.Action.Sys
@@ -11,12 +11,12 @@ namespace Libplanet.Action.Sys
     [ActionType("CreateValidatorAction")]
     public class CreateValidatorAction : SystemAction
     {
-        public BigInteger Amount { get; set; }
+        public FungibleAssetValue NativeToken { get; set; }
 
         protected override IImmutableDictionary<string, IValue> PlainValueInternal
             => new Dictionary<string, IValue>
             {
-                ["Amount"] = Amount.Serialize(),
+                ["NativeToken"] = NativeToken.Serialize(),
             }.ToImmutableDictionary();
 
         public override IAccountStateDelta Execute(IActionContext context)
@@ -38,7 +38,7 @@ namespace Libplanet.Action.Sys
                 validator = new Validator((List)serializedValidator);
             }
 
-            states = validator.Apply(states, Amount);
+            states = validator.Apply(states, NativeToken);
 
             return states;
         }
@@ -46,7 +46,7 @@ namespace Libplanet.Action.Sys
         protected override void LoadPlainValueInternal(
             IImmutableDictionary<string, IValue> plainValue)
         {
-            Amount = plainValue["Amount"].ToBigInteger();
+            NativeToken = plainValue["NativeToken"].ToFungibleAssetValue();
         }
     }
 }

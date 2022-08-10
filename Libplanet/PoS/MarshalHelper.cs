@@ -41,6 +41,14 @@ namespace Libplanet.PoS
                 .Add("decimalPlaces", new[] { currency.DecimalPlaces });
         }
 
+        public static IValue Serialize(this FungibleAssetValue fungibleAssetValue)
+        {
+            return Dictionary.Empty
+                .Add("currency", fungibleAssetValue.Currency.Serialize())
+                .Add("majorUnit", fungibleAssetValue.MajorUnit.Serialize())
+                .Add("minorUnit", fungibleAssetValue.MinorUnit.Serialize());
+        }
+
         public static Address ToAddress(this IValue serialized) =>
             new Address(((Binary)serialized).ToByteArray());
 
@@ -65,17 +73,30 @@ namespace Libplanet.PoS
         public static Guid ToGuid(this IValue serialized) =>
             new Guid(((Binary)serialized).ToByteArray());
 
-        public static Currency ToCurrency(this Dictionary serialized)
+        public static Currency ToCurrency(this IValue serialized)
         {
+            Dictionary serializedDict = (Dictionary)serialized;
             IImmutableSet<Address>? minters = null;
-            if (serialized["minters"] is List mintersAsList)
+            if (serializedDict["minters"] is List mintersAsList)
             {
                 minters = mintersAsList.Select(
                     b => new Address(((Binary)b).ByteArray)).ToImmutableHashSet();
             }
 
             return new Currency(
-                (Text)serialized["ticker"], ((Binary)serialized["decimalPlaces"]).First(), minters);
+                (Text)serializedDict["ticker"],
+                ((Binary)serializedDict["decimalPlaces"]).First(),
+                minters);
+        }
+
+        public static FungibleAssetValue ToFungibleAssetValue(this IValue serialized)
+        {
+            Dictionary serializedDict = (Dictionary)serialized;
+            return new FungibleAssetValue(
+                serializedDict["currency"].ToCurrency(),
+                serializedDict["majorUnit"].ToBigInteger(),
+                serializedDict["minorUnit"].ToBigInteger()
+            );
         }
     }
 }

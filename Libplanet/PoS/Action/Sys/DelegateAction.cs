@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Numerics;
 using Bencodex.Types;
+using Libplanet.Assets;
 using Libplanet.PoS;
 
 namespace Libplanet.Action.Sys
@@ -13,13 +13,13 @@ namespace Libplanet.Action.Sys
     {
         public Address ValidatorAddress { get; set; }
 
-        public BigInteger Amount { get; set; }
+        public FungibleAssetValue NativeToken { get; set; }
 
         protected override IImmutableDictionary<string, IValue> PlainValueInternal
             => new Dictionary<string, IValue>
         {
             ["ValidatorAddress"] = ValidatorAddress.Serialize(),
-            ["Amount"] = Amount.Serialize(),
+            ["NativeToken"] = NativeToken.Serialize(),
         }.ToImmutableDictionary();
 
         public override IAccountStateDelta Execute(IActionContext context)
@@ -30,18 +30,11 @@ namespace Libplanet.Action.Sys
 
             // if (ctx.Rehearsal)
             // Rehearsal mode is not implemented
-            Delegation delegation;
             IValue? serializedDelegation = states.GetState(delegationAddress);
-            if (serializedDelegation == null)
-            {
-                delegation = new Delegation(ctx.Signer, ValidatorAddress);
-            }
-            else
-            {
-                delegation = new Delegation((List)serializedDelegation);
-            }
-
-            states = delegation.Delegate(states, Amount);
+            Delegation delegation = (serializedDelegation == null)
+                ? new Delegation(ctx.Signer, ValidatorAddress)
+                : new Delegation((List)serializedDelegation);
+            states = delegation.Delegate(states, NativeToken);
 
             return states;
         }
@@ -50,7 +43,7 @@ namespace Libplanet.Action.Sys
             IImmutableDictionary<string, IValue> plainValue)
         {
             ValidatorAddress = plainValue["ValidatorAddress"].ToAddress();
-            Amount = plainValue["Amount"].ToBigInteger();
+            NativeToken = plainValue["Amount"].ToFungibleAssetValue();
         }
     }
 }
