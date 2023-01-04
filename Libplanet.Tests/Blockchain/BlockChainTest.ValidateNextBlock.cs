@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Numerics;
 using Bencodex.Types;
+using Libplanet.Action.Sys;
 using Libplanet.Blockchain;
 using Libplanet.Blockchain.Policies;
 using Libplanet.Blocks;
@@ -10,6 +12,7 @@ using Libplanet.Crypto;
 using Libplanet.Store;
 using Libplanet.Store.Trie;
 using Libplanet.Tests.Common.Action;
+using Libplanet.Tx;
 using Xunit;
 
 namespace Libplanet.Tests.Blockchain
@@ -431,6 +434,74 @@ namespace Libplanet.Tests.Blockchain
 
             Assert.Throws<InvalidBlockCommitException>(() =>
                 _blockChain.Append(validNextBlock, null));
+        }
+
+        [Fact]
+        public void ValidateValidatorSetChangedBlock()
+        {
+            var genesisValidatorSet = _blockChain.GetValidatorSet();
+            var newValidator = new Validator(new PrivateKey().PublicKey, BigInteger.One);
+            var txs = new ImmutableArray<Transaction<DumbAction>>
+            {
+                Transaction<DumbAction>.Create(
+                    _blockChain.GetNextTxNonce(_fx.Proposer.ToAddress()),
+                    _fx.Proposer,
+                    _fx.GenesisBlock.Hash,
+                    systemAction: new SetValidator(newValidator.PublicKey, newValidator.Power),
+                    timestamp: _fx.GenesisBlock.Timestamp.AddDays(1)),
+            };
+
+            Block<DumbAction> setValidatorBlock = new BlockContent<DumbAction>(
+                new BlockMetadata(
+                    index: 1L,
+                    timestamp: _fx.GenesisBlock.Timestamp.AddDays(1),
+                    publicKey: _fx.Proposer.PublicKey,
+                    previousHash: _fx.GenesisBlock.Hash,
+                    txHash: BlockContent<DumbAction>.DeriveTxHash(txs),
+                    lastCommit: null),
+                transactions: txs).Propose().Evaluate(_fx.Proposer, _blockChain);
+
+            _blockChain.Append(
+                setValidatorBlock,
+                new BlockCommit(
+                    1L,
+                    0,
+                    setValidatorBlock.Hash,
+                    _fx.ValidatorPrivateKeys.Select(privateKey => new VoteMetadata(
+                        1L,
+                        0,
+                        setValidatorBlock.Hash,
+                        _fx.GenesisBlock.Timestamp.AddDays(1),
+                        privateKey.PublicKey,
+                        VoteFlag.PreCommit).Sign(privateKey)).ToImmutableArray()));
+
+            Assert.Equal(
+                new ValidatorSet(genesisValidatorSet.Validators.Append(newValidator).ToList()),
+                _blockChain.GetValidatorSet());
+
+            Block<DumbAction> validNextBlock = new BlockContent<DumbAction>(
+                new BlockMetadata(
+                    index: 2L,
+                    timestamp: _fx.GenesisBlock.Timestamp.AddDays(2),
+                    publicKey: _fx.Proposer.PublicKey,
+                    previousHash: _fx.GenesisBlock.Hash,
+                    txHash: null,
+                    lastCommit: _blockChain.GetBlockCommit(1L)))
+                .Propose().Evaluate(_fx.Proposer, _blockChain);
+
+            _blockChain.Append(
+                validNextBlock,
+                new BlockCommit(
+                    2L,
+                    0,
+                    validNextBlock.Hash,
+                    _fx.ValidatorPrivateKeys.Select(privateKey => new VoteMetadata(
+                        2L,
+                        0,
+                        validNextBlock.Hash,
+                        _fx.GenesisBlock.Timestamp.AddDays(2),
+                        privateKey.PublicKey,
+                        VoteFlag.PreCommit).Sign(privateKey)).ToImmutableArray()));
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Libplanet.Consensus
     /// <summary>
     /// Represents a <see cref="Vote"/> from a validator for consensus.
     /// </summary>
-    public class Vote : IVoteMetadata, IEquatable<Vote>
+    public class Vote : IVoteMetadata, IEquatable<Vote>, IComparable<Vote>, IComparable
     {
         private const string SignatureKey = "signature";
 
@@ -169,6 +169,30 @@ namespace Libplanet.Consensus
                 { "timestamp", Timestamp.ToString(CultureInfo.InvariantCulture) },
             };
             return JsonSerializer.Serialize(dict);
+        }
+
+        /// <inheritdoc/>
+        [Pure]
+        int IComparable<Vote>.CompareTo(Vote? other)
+        {
+            return ValidatorPublicKey.ToAddress().CompareTo(other?.ValidatorPublicKey.ToAddress());
+        }
+
+        /// <inheritdoc/>
+        [Pure]
+        int IComparable.CompareTo(object? obj)
+        {
+            if (obj is Vote other)
+            {
+                return ((IComparable<Vote>)this).CompareTo(other);
+            }
+
+            if (obj is null)
+            {
+                throw new ArgumentNullException(nameof(obj));
+            }
+
+            throw new ArgumentException(nameof(obj));
         }
     }
 }

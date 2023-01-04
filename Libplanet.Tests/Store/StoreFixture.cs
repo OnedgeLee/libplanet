@@ -102,6 +102,7 @@ namespace Libplanet.Tests.Store
                     ? rh
                     : (HashDigest<SHA256>?)null;
             Proposer = TestUtils.GenesisProposer;
+            ValidatorPrivateKeys = TestUtils.ValidatorPrivateKeys;
             GenesisBlock = TestUtils.ProposeGenesis<DumbAction>(
                 proposer: Proposer.PublicKey
             ).Evaluate(
@@ -171,6 +172,8 @@ namespace Libplanet.Tests.Store
         public BlockHash Hash3 { get; }
 
         public PrivateKey Proposer { get; }
+
+        public List<PrivateKey> ValidatorPrivateKeys { get; }
 
         public Block<DumbAction> GenesisBlock { get; }
 

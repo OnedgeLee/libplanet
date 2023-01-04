@@ -110,10 +110,31 @@ namespace Libplanet.Blocks
                     nameof(votes));
             }
 
+            var sortedVotes = votes.Sort();
+            if (!sortedVotes.SequenceEqual(votes))
+            {
+                throw new ArgumentException(
+                    $"Votes are expected to be sorted according to the order of validator's " +
+                    $"address, but they aren't.\n" +
+                    sortedVotes.Aggregate("Expected : ", (
+                        current, next) => current + next.ValidatorPublicKey.ToString() + ", ") +
+                    votes.Aggregate("Actual : ", (
+                        current, next) => current + next.ValidatorPublicKey.ToString() + ", "));
+            }
+
             Height = height;
             Round = round;
             BlockHash = blockHash;
             Votes = votes;
+        }
+
+        public BlockCommit(
+           long height,
+           int round,
+           BlockHash blockHash,
+           IEnumerable<Vote> votes)
+            : this(height, round, blockHash, votes.OrderBy(vote => vote).ToImmutableArray())
+        {
         }
 
         public BlockCommit(byte[] marshaled)
