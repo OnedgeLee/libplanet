@@ -20,6 +20,8 @@ To be released.
     `IActionRenderer<T>.UnrenderActionError()`.  [[#3092]]
  -  Removed `NonblockRenderer`, `NonblockActionRenderer`, `DelayedRenderer`,
     and `DelayedActionRenderer` classes.  [[#3098]]
+ -  (Libplanet.Net) Replaced parameter `newHeightDelay` with `contextMinInterval`
+    from `ConsensusContext` and `ConsensusReactor`.  [[#3026]]
 
 ### Backward-incompatible network protocol changes
 
@@ -35,6 +37,10 @@ To be released.
     `IRenderer<T>.RenderReorgEnd()`, `IActionRenderer<T>.UnrenderAction()`,
     and `IActionRenderer<T>.UnrenderActionError()`, i.e., these interface
     methods are no longer invoked by a `BlockChain<T>`.  [[#3087]]
+ -  (Libplanet.Net) `ConsensusContext.NewHeight()` will be called immediately
+    right after `BlockChain<T>.Tip` changed.  [[#3026]]
+ -  (Libplanet.Net) `BlockChain<T>.Append` will be suspended till
+    `contextMinInterval` arrives.  [[#3026]]
 
 ### Bug fixes
 

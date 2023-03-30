@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Libplanet.Action;
 using Libplanet.Blocks;
 using Libplanet.Net.Messages;
 
@@ -23,6 +25,7 @@ namespace Libplanet.Net.Consensus
                 Height,
                 lastCommit);
             _lastCommit = lastCommit;
+            _startTime = DateTimeOffset.UtcNow;
             ProduceMutation(() => StartRound(0));
 
             // FIXME: Exceptions inside tasks should be handled properly.
@@ -231,6 +234,38 @@ namespace Libplanet.Net.Consensus
                 timeout,
                 ToString());
             ProduceMutation(() => ProcessTimeoutPreCommit(round));
+        }
+
+        /// <summary>
+        /// Schedules <see cref="Block{T}"/> to be
+        /// appended to the <see cref="_blockChain"/> after the context interval is over.
+        /// </summary>
+        /// <param name="committedBlock">The block that has been committed.</param>
+        private async Task OnContextIntervalOver(Block<T> committedBlock)
+        {
+            TimeSpan contextIntervalLacked = ConsensusContext.ContextMinInterval
+                - (DateTime.UtcNow - _startTime);
+            if (contextIntervalLacked > TimeSpan.Zero)
+            {
+                _logger.Debug(
+                    "Waiting lacked context interval {Delay}ms for " +
+                    "block #{Index} {Hash} (context: {Context})",
+                    contextIntervalLacked.TotalMilliseconds,
+                    committedBlock.Index,
+                    committedBlock.Hash,
+                    ToString());
+                await Task.Delay(
+                    contextIntervalLacked, _cancellationTokenSource.Token);
+            }
+
+            IsValid(committedBlock, out var evaluatedActions);
+            _blockChain.Append(
+                committedBlock,
+                GetBlockCommit(),
+                true,
+                true,
+                true,
+                actionEvaluations: evaluatedActions);
         }
     }
 }

@@ -266,16 +266,7 @@ namespace Libplanet.Net.Consensus
                         block4.Index,
                         block4.Hash,
                         ToString());
-
-                    IsValid(block4, out var evaluatedActions);
-
-                    _blockChain.Append(
-                        block4,
-                        GetBlockCommit(),
-                        true,
-                        true,
-                        true,
-                        actionEvaluations: evaluatedActions);
+                    _ = OnContextIntervalOver(block4);
                 }
                 catch (Exception e)
                 {
