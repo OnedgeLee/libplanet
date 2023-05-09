@@ -10,11 +10,16 @@ To be released.
 
 ### Backward-incompatible API changes
 
+ -  Added `ITransaction.MaxGasPrice` property.  [[#3201]]
+ -  Added `ITransaction.GasLimit` property.  [[#3201]]
+
 ### Backward-incompatible network protocol changes
 
 ### Backward-incompatible storage format changes
 
 ### Added APIs
+
+ -  Added `FungibleAssetValue.Serialize()` method.  [[#3201]]
 
 ### Behavioral changes
 
