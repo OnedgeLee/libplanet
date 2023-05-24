@@ -112,6 +112,11 @@ namespace Libplanet.Net.Messages
             ConsensusCommit = 0x42,
 
             /// <summary>
+            /// Consensus message that informs other peer that the peer has a vote of majority 2/3.
+            /// </summary>
+            ConsensusMaj23Msg = 0x45,
+
+            /// <summary>
             /// List of message IDs that the peer seen recently.
             /// </summary>
             HaveMessage = 0x43,
