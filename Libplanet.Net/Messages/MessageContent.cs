@@ -117,6 +117,11 @@ namespace Libplanet.Net.Messages
             ConsensusMaj23Msg = 0x45,
 
             /// <summary>
+            /// Consensus message that informs vote sets that the peer have to other peer.
+            /// </summary>
+            ConsensusVoteSetBitsMsg = 0x46,
+
+            /// <summary>
             /// List of message IDs that the peer seen recently.
             /// </summary>
             HaveMessage = 0x43,
