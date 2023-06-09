@@ -160,12 +160,18 @@ namespace Libplanet.Net.Consensus
         private async Task ConsumeMutation(CancellationToken cancellationToken)
         {
             System.Action mutation = await _mutationRequests.Reader.ReadAsync(cancellationToken);
-            (int MessageLogSize, int Round, ConsensusStep Step) prevState =
-                (_messageLog.GetTotalCount(), Round, Step);
+            var prevState = new ContextState(
+                _messageLog.GetTotalCount(),
+                Round,
+                Step,
+                GetProposal(Round)?.Item1.Hash);
             mutation();
-            (int MessageLogSize, int Round, ConsensusStep Step) nextState =
-                (_messageLog.GetTotalCount(), Round, Step);
-            while (prevState != nextState)
+            var nextState = new ContextState(
+                _messageLog.GetTotalCount(),
+                Round,
+                Step,
+                GetProposal(Round)?.Item1.Hash);
+            while (!prevState.Equals(nextState))
             {
                 _logger.Information(
                     "State (MessageLogSize, Round, Step) changed from " +
@@ -179,9 +185,17 @@ namespace Libplanet.Net.Consensus
                     nextState.Step);
                 StateChanged?.Invoke(
                     this, (nextState.MessageLogSize, nextState.Round, nextState.Step));
-                prevState = (_messageLog.GetTotalCount(), Round, Step);
+                prevState = new ContextState(
+                    _messageLog.GetTotalCount(),
+                    Round,
+                    Step,
+                    GetProposal(Round)?.Item1.Hash);
                 ProcessGenericUponRules();
-                nextState = (_messageLog.GetTotalCount(), Round, Step);
+                nextState = new ContextState(
+                    _messageLog.GetTotalCount(),
+                    Round,
+                    Step,
+                    GetProposal(Round)?.Item1.Hash);
             }
 
             MutationConsumed?.Invoke(this, mutation);
@@ -233,6 +247,47 @@ namespace Libplanet.Net.Consensus
                 timeout,
                 ToString());
             ProduceMutation(() => ProcessTimeoutPreCommit(round));
+        }
+
+        private struct ContextState : IEquatable<ContextState>
+        {
+            public ContextState(
+                int messageLogSize,
+                int round,
+                ConsensusStep step,
+                BlockHash? proposal)
+            {
+                MessageLogSize = messageLogSize;
+                Round = round;
+                Step = step;
+                Proposal = proposal;
+            }
+
+            public int MessageLogSize { get; }
+
+            public int Round { get; }
+
+            public ConsensusStep Step { get; }
+
+            public BlockHash? Proposal { get; }
+
+            public bool Equals(ContextState other)
+            {
+                return MessageLogSize == other.MessageLogSize &&
+                       Round == other.Round &&
+                       Step == other.Step &&
+                       Proposal.Equals(other.Proposal);
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return obj is ContextState other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(MessageLogSize, Round, (int)Step, Proposal.GetHashCode());
+            }
         }
     }
 }
