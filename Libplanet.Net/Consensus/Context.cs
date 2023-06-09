@@ -251,6 +251,50 @@ namespace Libplanet.Net.Consensus
             return blockCommit;
         }
 
+        public VoteSetBits GetVoteSetBits(int round, BlockHash blockHash, VoteFlag flag)
+        {
+            var votes = flag switch
+            {
+                VoteFlag.PreVote => _messageLog.GetPreVotes(round)
+                    .Where(msg => msg.BlockHash.Equals(blockHash))
+                    .Select(msg => msg.PreVote),
+                VoteFlag.PreCommit => _messageLog.GetPreCommits(round)
+                    .Where(msg => msg.BlockHash.Equals(blockHash))
+                    .Select(msg => msg.PreCommit),
+                _ => throw new ArgumentException(
+                    "VoteFlag should be either PreVote or PreCommit.",
+                    nameof(flag)),
+            };
+
+            return new VoteSetBitsMetadata(
+                Height,
+                round,
+                blockHash,
+                DateTimeOffset.UtcNow,
+                _privateKey.PublicKey,
+                flag,
+                votes).Sign(_privateKey);
+        }
+
+        public IEnumerable<ConsensusMsg> GetVoteSetBitsResponse(int round, VoteFlag flag)
+        {
+            // TODO: Add appropriate exception for this.
+            var proposal = _messageLog.GetProposal(round) ??
+                           throw new Exception($"No proposal for round {round}");
+            IEnumerable<ConsensusMsg> votes = flag switch
+            {
+                VoteFlag.PreVote => _messageLog.GetPreVotes(round),
+                VoteFlag.PreCommit => _messageLog.GetPreCommits(round),
+                _ => throw new ArgumentException(
+                    "VoteFlag should be PreVote or PreCommit.",
+                    nameof(flag)),
+            };
+
+            var list = votes.ToList();
+            list.Insert(0, proposal);
+            return list;
+        }
+
         /// <summary>
         /// Returns the summary of context in JSON-formatted string.
         /// </summary>
@@ -483,40 +527,6 @@ namespace Libplanet.Net.Consensus
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Checks whether the round has +2/3 <see cref="ConsensusPreVoteMsg"/> for
-        /// <paramref name="round"/> and <paramref name="predicate"/>.
-        /// </summary>
-        /// <param name="round">The round to check.</param>
-        /// <param name="predicate">An additional predicate for counting votes.</param>
-        /// <returns>Returns <see langword="true"/> if the count is +2/3,
-        /// otherwise <see langword="false"/>.</returns>
-        private bool HasTwoThirdsPreVote(int round, Func<ConsensusPreVoteMsg, bool> predicate)
-        {
-            var validatorPublicKeys = _messageLog.GetPreVotes(round).FindAll(
-                preVote => predicate(preVote)).Select(
-                preVote => preVote.PreVote.ValidatorPublicKey).ToList();
-            return _validatorSet.GetValidatorsPower(validatorPublicKeys)
-                > _validatorSet.TwoThirdsPower;
-        }
-
-        /// <summary>
-        /// Checks whether the round has +2/3 <see cref="ConsensusPreCommitMsg"/> for
-        /// <paramref name="round"/> and <paramref name="predicate"/>.
-        /// </summary>
-        /// <param name="round">The round to check.</param>
-        /// <param name="predicate">An additional predicate for counting votes.</param>
-        /// <returns>Returns <see langword="true"/> if the count is +2/3,
-        /// otherwise <see langword="false"/>.</returns>
-        private bool HasTwoThirdsPreCommit(int round, Func<ConsensusPreCommitMsg, bool> predicate)
-        {
-            var validatorPublicKeys = _messageLog.GetPreCommits(round).FindAll(
-                preCommit => predicate(preCommit)).Select(
-                preCommit => preCommit.PreCommit.ValidatorPublicKey).ToList();
-            return _validatorSet.GetValidatorsPower(validatorPublicKeys)
-                > _validatorSet.TwoThirdsPower;
         }
 
         /// <summary>

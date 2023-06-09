@@ -35,6 +35,7 @@ namespace Libplanet.Net.Consensus
         private Dictionary<int, ConsensusProposalMsg> _proposals;
         private Dictionary<int, Dictionary<PublicKey, ConsensusPreVoteMsg>> _preVotes;
         private Dictionary<int, Dictionary<PublicKey, ConsensusPreCommitMsg>> _preCommits;
+        private Dictionary<int, List<ConsensusMaj23Msg>> _maj23s;
 
         internal MessageLog(long height, ValidatorSet validators)
         {
@@ -49,6 +50,7 @@ namespace Libplanet.Net.Consensus
             _proposals = new Dictionary<int, ConsensusProposalMsg>();
             _preVotes = new Dictionary<int, Dictionary<PublicKey, ConsensusPreVoteMsg>>();
             _preCommits = new Dictionary<int, Dictionary<PublicKey, ConsensusPreCommitMsg>>();
+            _maj23s = new Dictionary<int, List<ConsensusMaj23Msg>>();
             _lock = new object();
         }
 
@@ -128,10 +130,34 @@ namespace Libplanet.Net.Consensus
                 {
                     if (_proposals.ContainsKey(proposal2.Round))
                     {
-                        var msg =
-                            "There is already a proposal for given proposal message's round " +
-                            proposal2.Round;
-                        throw new InvalidConsensusMessageException(msg, message);
+                        if (_maj23s.ContainsKey(proposal2.Round) &&
+                            _maj23s[proposal2.Round]
+                                .Any(maj23 => maj23.BlockHash.Equals(proposal2.BlockHash)) &&
+                            (HasTwoThirdsPreVote(
+                                 proposal2.Round,
+                                 msg => msg.BlockHash.Equals(proposal2.BlockHash)) ||
+                             HasTwoThirdsPreCommit(
+                                 proposal2.Round,
+                                 msg => msg.BlockHash.Equals(proposal2.BlockHash))))
+                        {
+                            // If maj23 is received and received proposal's BlockHash is equal to
+                            // maj23's BlockHash, and collected +2/3 votes, override proposal.
+                            // TODO: Store proposal in somewhere and pull it out when
+                            // the conditions are met.
+                            _logger.Debug(
+                                "Override proposal from {Before} to After} since " +
+                                "maj23 has collected and +2/3 votes are collected",
+                                _proposals[proposal2.Round].BlockHash,
+                                proposal2.BlockHash);
+                            _proposals[proposal2.Round] = proposal2;
+                        }
+                        else
+                        {
+                            var msg =
+                                "There is already a proposal for given proposal message's round " +
+                                proposal2.Round + " and there are no appropriate maj23 received";
+                            throw new InvalidConsensusMessageException(msg, message);
+                        }
                     }
                     else
                     {
@@ -176,6 +202,25 @@ namespace Libplanet.Net.Consensus
                     else
                     {
                         _preCommits[preCommit.Round][preCommit.ValidatorPublicKey] = preCommit;
+                    }
+                }
+                else if (message is ConsensusMaj23Msg maj23)
+                {
+                    if (!_maj23s.ContainsKey(maj23.Round))
+                    {
+                        _maj23s[maj23.Round] = new List<ConsensusMaj23Msg>();
+                    }
+
+                    if (_maj23s[maj23.Round].Any(maj => maj.BlockHash.Equals(maj23.BlockHash)))
+                    {
+                        var msg =
+                            "There is already a maj23 message for given maj23 message's " +
+                            $"round {maj23.Round} and blockHash {maj23.BlockHash}";
+                        throw new InvalidConsensusMessageException(msg, message);
+                    }
+                    else
+                    {
+                        _maj23s[maj23.Round].Add(maj23);
                     }
                 }
                 else
@@ -336,6 +381,49 @@ namespace Libplanet.Net.Consensus
                         hash);
                     return null;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Checks whether the round has +2/3 <see cref="ConsensusPreVoteMsg"/> for
+        /// <paramref name="round"/> and <paramref name="predicate"/>.
+        /// </summary>
+        /// <param name="round">The round to check.</param>
+        /// <param name="predicate">An additional predicate for counting votes.</param>
+        /// <returns>Returns <see langword="true"/> if the count is +2/3,
+        /// otherwise <see langword="false"/>.</returns>
+        internal bool HasTwoThirdsPreVote(int round, Func<ConsensusPreVoteMsg, bool> predicate)
+        {
+            var validatorPublicKeys = GetPreVotes(round).FindAll(
+                preVote => predicate(preVote)).Select(
+                preVote => preVote.PreVote.ValidatorPublicKey).ToList();
+            return _validators.GetValidatorsPower(validatorPublicKeys)
+                   > _validators.TwoThirdsPower;
+        }
+
+        /// <summary>
+        /// Checks whether the round has +2/3 <see cref="ConsensusPreCommitMsg"/> for
+        /// <paramref name="round"/> and <paramref name="predicate"/>.
+        /// </summary>
+        /// <param name="round">The round to check.</param>
+        /// <param name="predicate">An additional predicate for counting votes.</param>
+        /// <returns>Returns <see langword="true"/> if the count is +2/3,
+        /// otherwise <see langword="false"/>.</returns>
+        internal bool HasTwoThirdsPreCommit(int round, Func<ConsensusPreCommitMsg, bool> predicate)
+        {
+            var validatorPublicKeys = GetPreCommits(round).FindAll(
+                preCommit => predicate(preCommit)).Select(
+                preCommit => preCommit.PreCommit.ValidatorPublicKey).ToList();
+            return _validators.GetValidatorsPower(validatorPublicKeys)
+                   > _validators.TwoThirdsPower;
+        }
+
+        internal bool PeerMaj23(int round, BlockHash hash)
+        {
+            lock (_lock)
+            {
+                return _maj23s.ContainsKey(round) &&
+                       _maj23s[round].Any(maj => maj.BlockHash.Equals(hash));
             }
         }
 

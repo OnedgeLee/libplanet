@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.Contracts;
 using System.Linq;
@@ -83,6 +84,9 @@ namespace Libplanet.Consensus
 
         /// <inheritdoc cref="VoteSetBitsMetadata.Flag"/>
         public VoteFlag Flag => _voteSetBitsMetadata.Flag;
+
+        /// <inheritdoc cref="VoteSetBitsMetadata.Votes"/>
+        public IEnumerable<Vote> Votes => _voteSetBitsMetadata.Votes;
 
         /// <summary>
         /// A signature that signed with <see cref="VoteSetBitsMetadata"/>.

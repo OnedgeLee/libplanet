@@ -139,7 +139,7 @@ namespace Libplanet.Net.Consensus
             if (propose is { } p2 &&
                 p2.ValidRound >= 0 &&
                 p2.ValidRound < Round &&
-                HasTwoThirdsPreVote(
+                _messageLog.HasTwoThirdsPreVote(
                     p2.ValidRound, preVote => p2.Block.Hash.Equals(preVote.BlockHash)) &&
                 Step == ConsensusStep.Propose)
             {
@@ -158,12 +158,23 @@ namespace Libplanet.Net.Consensus
                 }
                 else
                 {
-                    BroadcastMessage(
-                        new ConsensusPreVoteMsg(MakeVote(Round, null, VoteFlag.PreVote)));
+                    if (_messageLog.PeerMaj23(Round, p2.Block.Hash))
+                    {
+                        // If there are +2/3 validators claim that the block is valid
+                        // and have collected +2/3 pre-votes,
+                        // reset lock and enter pre-commit state.
+                        _lockedRound = -1;
+                        _lockedValue = null;
+                    }
+                    else
+                    {
+                        BroadcastMessage(
+                            new ConsensusPreVoteMsg(MakeVote(Round, null, VoteFlag.PreVote)));
+                    }
                 }
             }
 
-            if (HasTwoThirdsPreVote(Round, _ => true) &&
+            if (_messageLog.HasTwoThirdsPreVote(Round, _ => true) &&
                 Step == ConsensusStep.PreVote &&
                 !_preVoteTimeoutFlags.Contains(Round))
             {
@@ -177,7 +188,7 @@ namespace Libplanet.Net.Consensus
             }
 
             if (propose is { } p3 &&
-                HasTwoThirdsPreVote(
+                _messageLog.HasTwoThirdsPreVote(
                     Round, preVote => p3.Block.Hash.Equals(preVote.BlockHash)) &&
                 IsValid(p3.Block, out _) &&
                 (Step == ConsensusStep.PreVote || Step == ConsensusStep.PreCommit) &&
@@ -208,7 +219,7 @@ namespace Libplanet.Net.Consensus
                 _validRound = Round;
             }
 
-            if (HasTwoThirdsPreVote(Round, preVote => preVote.BlockHash is null) &&
+            if (_messageLog.HasTwoThirdsPreVote(Round, preVote => preVote.BlockHash is null) &&
                 Step == ConsensusStep.PreVote)
             {
                 _logger.Debug(
@@ -221,7 +232,7 @@ namespace Libplanet.Net.Consensus
                     new ConsensusPreCommitMsg(MakeVote(Round, null, VoteFlag.PreCommit)));
             }
 
-            if (HasTwoThirdsPreCommit(Round, preCommit => true) &&
+            if (_messageLog.HasTwoThirdsPreCommit(Round, preCommit => true) &&
                 !_preCommitTimeoutFlags.Contains(Round))
             {
                 _logger.Debug(
@@ -251,7 +262,7 @@ namespace Libplanet.Net.Consensus
             int round = message.Round;
             if ((message is ConsensusProposalMsg || message is ConsensusPreCommitMsg) &&
                 GetProposal(round) is (Block block4, _) &&
-                HasTwoThirdsPreCommit(
+                _messageLog.HasTwoThirdsPreCommit(
                     round, preCommit => block4.Hash.Equals(preCommit.BlockHash)) &&
                 IsValid(block4, out _))
             {

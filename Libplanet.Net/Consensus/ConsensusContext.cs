@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Libplanet.Blockchain;
 using Libplanet.Blocks;
+using Libplanet.Consensus;
 using Libplanet.Crypto;
 using Libplanet.Net.Messages;
 using Serilog;
@@ -265,6 +267,90 @@ namespace Libplanet.Net.Consensus
                 _contexts[height].ProduceMessage(consensusMessage);
                 return true;
             }
+        }
+
+        /// <summary>
+        /// Handles a received <see cref="Maj23"/> and return message to fetch.
+        /// </summary>
+        /// <param name="maj23">The <see cref="Maj23"/> received from any validator.
+        /// </param>
+        /// <returns>
+        /// A nullable <see cref="VoteSetBits"/> to reply back.
+        /// </returns>
+        public VoteSetBits? HandleMaj23(ConsensusMaj23Msg maj23)
+        {
+            long height = maj23.Maj23.Height;
+            if (height < Height)
+            {
+                _logger.Debug(
+                    "Ignore a received VoteSetBits as its height " +
+                    "#{Height} is lower than the current context's height #{ContextHeight}",
+                    height,
+                    Height);
+            }
+            else
+            {
+                lock (_contextLock)
+                {
+                    if (_contexts.ContainsKey(height))
+                    {
+                        _contexts[height].ProduceMessage(maj23);
+                        return _contexts[height]
+                            .GetVoteSetBits(
+                                maj23.Maj23.Round,
+                                maj23.Maj23.BlockHash,
+                                maj23.Maj23.Flag);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Handles a received <see cref="VoteSetBits"/> and return message to fetch.
+        /// </summary>
+        /// <param name="voteSetBits">The <see cref="VoteSetBits"/> received from any validator.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IEnumerable{ConsensusMsg}"/> to reply back.
+        /// </returns>
+        /// <remarks>This method does not update state of the context.</remarks>
+        public IEnumerable<ConsensusMsg> HandleVoteSetBits(VoteSetBits voteSetBits)
+        {
+            long height = voteSetBits.Height;
+            if (height < Height)
+            {
+                _logger.Debug(
+                    "Ignore a received VoteSetBits as its height " +
+                    "#{Height} is lower than the current context's height #{ContextHeight}",
+                    height,
+                    Height);
+            }
+            else
+            {
+                lock (_contextLock)
+                {
+                    if (_contexts.ContainsKey(height))
+                    {
+                        // NOTE: Should check if collected messages have same BlockHash with
+                        // VoteSetBit's BlockHash?
+                        return _contexts[height]
+                            .GetVoteSetBitsResponse(voteSetBits.Round, voteSetBits.Flag)
+                            .Where(msg => msg is ConsensusProposalMsg ||
+                                          (msg is ConsensusPreVoteMsg preVote &&
+                                           !voteSetBits.Votes.Any(
+                                               vote => vote.ValidatorPublicKey.Equals(
+                                                   preVote.ValidatorPublicKey))) ||
+                                          (msg is ConsensusPreCommitMsg preCommit &&
+                                           !voteSetBits.Votes.Any(
+                                               vote => vote.ValidatorPublicKey.Equals(
+                                                   preCommit.ValidatorPublicKey))));
+                    }
+                }
+            }
+
+            return Array.Empty<ConsensusMsg>();
         }
 
         /// <summary>

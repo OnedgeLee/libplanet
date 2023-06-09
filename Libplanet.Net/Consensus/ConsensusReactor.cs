@@ -160,6 +160,54 @@ namespace Libplanet.Net.Consensus
         {
             switch (content)
             {
+                case ConsensusVoteSetBitsMsg voteSetBits:
+                    // Note: ConsensusVoteSetBitsMsg will not be stored to context's message log.
+                    var messages = _consensusContext.HandleVoteSetBits(voteSetBits.VoteSetBits);
+                    try
+                    {
+                        var sender = _gossip.Peers.First(
+                            peer => peer.PublicKey.Equals(voteSetBits.ValidatorPublicKey));
+                        foreach (var msg in messages)
+                        {
+                            _gossip.PublishMessage(msg, new[] { sender });
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        _logger.Debug(
+                            "Cannot respond received ConsensusVoteSetBitsMsg message" +
+                            " {Message} since there is no corresponding peer in the table",
+                            voteSetBits);
+                    }
+
+                    break;
+
+                case ConsensusMaj23Msg maj23Msg:
+                    try
+                    {
+                        var sender = _gossip.Peers.First(
+                        peer => peer.PublicKey.Equals(maj23Msg.ValidatorPublicKey));
+                        var reply = _consensusContext.HandleMaj23(maj23Msg);
+                        if (reply is null)
+                        {
+                            // Reply is not needed. Ignore the message.
+                            break;
+                        }
+
+                        _gossip.PublishMessage(
+                            new ConsensusVoteSetBitsMsg(reply),
+                            new[] { sender });
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        _logger.Debug(
+                            "Cannot respond received ConsensusMaj23Msg message " +
+                            "{Message} since there is no corresponding peer in the table",
+                            maj23Msg);
+                    }
+
+                    break;
+
                 case ConsensusMsg consensusMsg:
                     _consensusContext.HandleMessage(consensusMsg);
                     break;
