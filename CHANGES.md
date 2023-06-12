@@ -10,11 +10,30 @@ To be released.
 
 ### Backward-incompatible API changes
 
+ -  (Libplanet.Net) Renamed `Step` enum to `ConsensusStep`
+    to remove ambiguity.  [[#3206]]
+
 ### Backward-incompatible network protocol changes
 
 ### Backward-incompatible storage format changes
 
 ### Added APIs
+
+ -  Added `Maj23` and its related classes.  [[#3206]]
+     -  Added `Maj23` class.
+     -  Added `Maj23Metadata` class.
+     -  (Libplanet.Net) Added `ConsensusMaj23Msg` class.
+ -  Added `VoteSetBits` and its related classes.  [[#3206]]
+     -  Added `VoteSetBits` class.
+     -  Added `VoteSetBitsMetadata` class.
+     -  (Libplanet.Net) Added `ConsensusVoteSetBitsMsg` class.
+ -  (Libplanet.Net) Added `Context.GetVoteSetBits()` method.  [[#3206]]
+ -  (Libplanet.Net) Added `ConsensusContext.HandleMaj23()` method.  [[#3206]]
+ -  (Libplanet.Net) Added `ConsensusContext.HandleVoteSetBits()` method.
+    [[#3206]]
+ -  (Libplanet.Net) Added
+    `Gossip.PublishMessage(MessageContent, IEnumerable<BoundPeer>)` method.
+    [[#3206]]
 
 ### Behavioral changes
 
@@ -23,6 +42,8 @@ To be released.
 ### Dependencies
 
 ### CLI tools
+
+[#3206]: https://github.com/planetarium/libplanet/pull/3206
 
 
 Version 2.0.0
