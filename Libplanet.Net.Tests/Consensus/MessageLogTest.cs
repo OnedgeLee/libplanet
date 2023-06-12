@@ -228,5 +228,50 @@ namespace Libplanet.Net.Tests.Consensus
             Assert.Equal(
                 3, blockCommit!.Votes.Where(vote => vote.Flag == VoteFlag.PreCommit).Count());
         }
+
+        [Fact]
+        public void PeerMaj23()
+        {
+            var blockHash1 = new BlockHash(TestUtils.GetRandomBytes(BlockHash.Size));
+            var blockHash2 = new BlockHash(TestUtils.GetRandomBytes(BlockHash.Size));
+            Assert.False(_messageLog.PeerMaj23(0, blockHash1));
+            Assert.False(_messageLog.PeerMaj23(0, blockHash2));
+            var maj23 = new ConsensusMaj23Msg(new Maj23Metadata(
+                3,
+                0,
+                blockHash1,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[0].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[0]));
+            Assert.Throws<InvalidConsensusMessageException>(() => _messageLog.Add(maj23));
+            maj23 = new ConsensusMaj23Msg(new Maj23Metadata(
+                2,
+                0,
+                blockHash1,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[0].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[0]));
+            _messageLog.Add(maj23);
+            Assert.True(_messageLog.PeerMaj23(0, blockHash1));
+            Assert.False(_messageLog.PeerMaj23(0, blockHash2));
+            maj23 = new ConsensusMaj23Msg(new Maj23Metadata(
+                2,
+                0,
+                blockHash1,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[1].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[1]));
+            Assert.Throws<InvalidConsensusMessageException>(() => _messageLog.Add(maj23));
+            maj23 = new ConsensusMaj23Msg(new Maj23Metadata(
+                2,
+                0,
+                blockHash2,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[2].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[2]));
+            _messageLog.Add(maj23);
+            Assert.True(_messageLog.PeerMaj23(0, blockHash1));
+            Assert.True(_messageLog.PeerMaj23(0, blockHash2));
+        }
     }
 }

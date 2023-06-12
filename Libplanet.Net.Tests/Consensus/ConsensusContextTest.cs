@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Bencodex;
 using Libplanet.Blocks;
 using Libplanet.Consensus;
 using Libplanet.Crypto;
@@ -252,6 +253,137 @@ namespace Libplanet.Net.Tests.Consensus
                 !x.ValidatorPublicKey.Equals(TestUtils.PrivateKeys[0].PublicKey)));
 
             Assert.Equal(expectedVotes, actualVotesWithoutInvalid);
+        }
+
+        [Fact]
+        public void HandleMaj23()
+        {
+            PrivateKey proposer = TestUtils.PrivateKeys[1];
+            var (blockChain, consensusContext) = TestUtils.CreateDummyConsensusContext(
+                TimeSpan.FromSeconds(1),
+                TestUtils.Policy,
+                TestUtils.PrivateKeys[0]);
+            consensusContext.NewHeight(1);
+            var block = blockChain.ProposeBlock(proposer);
+            var proposal = new ProposalMetadata(
+                1,
+                0,
+                DateTimeOffset.UtcNow,
+                proposer.PublicKey,
+                new Codec().Encode(block.MarshalBlock()),
+                -1).Sign(proposer);
+            var preVote1 = new VoteMetadata(
+                1,
+                0,
+                block.Hash,
+                DateTimeOffset.UtcNow,
+                proposer.PublicKey,
+                VoteFlag.PreVote).Sign(proposer);
+            var preVote2 = new VoteMetadata(
+                1,
+                0,
+                block.Hash,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[2].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[2]);
+            var preVote3 = new VoteMetadata(
+                1,
+                0,
+                block.Hash,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[3].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[3]);
+            consensusContext.HandleMessage(new ConsensusProposalMsg(proposal));
+            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote1));
+            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote2));
+            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote3));
+
+            // VoteSetBits expects missing votes and corresponding proposal
+            var maj23 =
+                new Maj23Metadata(
+                        1,
+                        0,
+                        block.Hash,
+                        DateTimeOffset.UtcNow,
+                        TestUtils.PrivateKeys[1].PublicKey,
+                        VoteFlag.PreCommit)
+                    .Sign(TestUtils.PrivateKeys[1]);
+            VoteSetBits? voteSetBits = consensusContext.HandleMaj23(new ConsensusMaj23Msg(maj23));
+            Assert.NotNull(voteSetBits);
+        }
+
+        [Fact]
+        public async void HandleVoteSetBits()
+        {
+            PrivateKey proposer = TestUtils.PrivateKeys[1];
+            ConsensusStep step = ConsensusStep.Default;
+            var stepChanged = new AsyncAutoResetEvent();
+            var (blockChain, consensusContext) = TestUtils.CreateDummyConsensusContext(
+                TimeSpan.FromSeconds(1),
+                TestUtils.Policy,
+                TestUtils.PrivateKeys[0]);
+            consensusContext.NewHeight(1);
+            consensusContext.StateChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.Step != step)
+                {
+                    step = eventArgs.Step;
+                    stepChanged.Set();
+                }
+            };
+            var block = blockChain.ProposeBlock(proposer);
+            var proposal = new ProposalMetadata(
+                1,
+                0,
+                DateTimeOffset.UtcNow,
+                proposer.PublicKey,
+                new Codec().Encode(block.MarshalBlock()),
+                -1).Sign(proposer);
+            var preVote1 = new VoteMetadata(
+                1,
+                0,
+                block.Hash,
+                DateTimeOffset.UtcNow,
+                proposer.PublicKey,
+                VoteFlag.PreVote).Sign(proposer);
+            var preVote2 = new VoteMetadata(
+                1,
+                0,
+                block.Hash,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[2].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[2]);
+            var preVote3 = new VoteMetadata(
+                1,
+                0,
+                block.Hash,
+                DateTimeOffset.UtcNow,
+                TestUtils.PrivateKeys[3].PublicKey,
+                VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[3]);
+            consensusContext.HandleMessage(new ConsensusProposalMsg(proposal));
+            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote1));
+            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote2));
+            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote3));
+            do
+            {
+                await stepChanged.WaitAsync();
+            }
+            while (step != ConsensusStep.PreCommit);
+
+            // VoteSetBits expects missing votes and corresponding proposal
+            var voteSetBits =
+                new VoteSetBitsMetadata(
+                        1,
+                        0,
+                        block.Hash,
+                        DateTimeOffset.UtcNow,
+                        TestUtils.PrivateKeys[1].PublicKey,
+                        VoteFlag.PreVote,
+                        new[] { preVote1, preVote2, preVote3 })
+                    .Sign(TestUtils.PrivateKeys[1]);
+            ConsensusMsg[] votesAndProposal =
+                consensusContext.HandleVoteSetBits(voteSetBits).ToArray();
+            Assert.IsType<ConsensusProposalMsg>(votesAndProposal[0]);
         }
     }
 }
