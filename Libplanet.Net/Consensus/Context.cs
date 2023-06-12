@@ -510,6 +510,37 @@ namespace Libplanet.Net.Consensus
         }
 
         /// <summary>
+        /// Creates a signed <see cref="Maj23"/> for a <see cref="ConsensusMaj23Msg"/>.
+        /// </summary>
+        /// <param name="round">Current context round.</param>
+        /// <param name="hash">Current context locked <see cref="BlockHash"/>.</param>
+        /// <param name="flag"><see cref="VoteFlag"/> of <see cref="Maj23"/> to create.
+        /// Set to <see cref="VoteFlag.PreVote"/> if +2/3 <see cref="ConsensusPreVoteMsg"/>
+        /// messages that votes to the same block with proposal are collected.
+        /// If +2/3 <see cref="ConsensusPreCommitMsg"/> messages that votes to the same block
+        /// with proposal are collected, Set to <see cref="VoteFlag.PreCommit"/>.</param>
+        /// <returns>Returns a signed <see cref="Maj23"/> with consensus private key.</returns>
+        /// <exception cref="ArgumentException">If <paramref name="flag"/> is either
+        /// <see cref="VoteFlag.Null"/> or <see cref="VoteFlag.Unknown"/>.</exception>
+        private Maj23 MakeMaj23(int round, BlockHash hash, VoteFlag flag)
+        {
+            if (flag == VoteFlag.Null || flag == VoteFlag.Unknown)
+            {
+                throw new ArgumentException(
+                    $"{nameof(flag)} must be either {VoteFlag.PreVote} or {VoteFlag.PreCommit}" +
+                    $"to create a valid signed maj23.");
+            }
+
+            return new Maj23Metadata(
+                Height,
+                round,
+                hash,
+                DateTimeOffset.UtcNow,
+                _privateKey.PublicKey,
+                flag).Sign(_privateKey);
+        }
+
+        /// <summary>
         /// Gets the proposed block and valid round of the given round.
         /// </summary>
         /// <param name="round">A round to get.</param>

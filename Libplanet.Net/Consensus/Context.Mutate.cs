@@ -213,6 +213,11 @@ namespace Libplanet.Net.Consensus
                     BroadcastMessage(
                         new ConsensusPreCommitMsg(
                             MakeVote(Round, p3.Block.Hash, VoteFlag.PreCommit)));
+
+                    // Maybe need to broadcast periodically?
+                    BroadcastMessage(
+                        new ConsensusMaj23Msg(
+                            MakeMaj23(Round, p3.Block.Hash, VoteFlag.PreVote)));
                 }
 
                 _validValue = p3.Block;
@@ -269,6 +274,11 @@ namespace Libplanet.Net.Consensus
                 Step = ConsensusStep.EndCommit;
                 _decision = block4;
                 _committedRound = round;
+
+                // Maybe need to broadcast periodically?
+                BroadcastMessage(
+                    new ConsensusMaj23Msg(
+                        MakeMaj23(round, block4.Hash, VoteFlag.PreCommit)));
 
                 try
                 {
