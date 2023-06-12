@@ -216,7 +216,7 @@ namespace Libplanet.Net.Tests.Consensus
                 TestUtils.PrivateKeys[3].PublicKey,
                 VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[3])));
 
-            await Task.Delay(100);  // Wait for the new message to be added to the message log.
+            await Task.Delay(1000);  // Wait for the new message to be added to the message log.
             commit = context.GetBlockCommit();
             Assert.Equal(4, commit?.Votes.Where(vote => vote.Flag == VoteFlag.PreCommit).Count());
         }
