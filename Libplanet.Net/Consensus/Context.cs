@@ -216,6 +216,8 @@ namespace Libplanet.Net.Consensus
         /// </summary>
         public ConsensusStep Step { get; private set; }
 
+        public Proposal Proposal { get; private set; }
+
         /// <summary>
         /// A command class for receiving <see cref="ConsensusMsg"/> from or broadcasts to other
         /// validators.
@@ -558,20 +560,6 @@ namespace Libplanet.Net.Consensus
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Checks whether given <paramref name="round"/> has +1/3 distinct validators
-        /// already participating in it, i.e. has a <see cref="ConsensusMsg"/> in the
-        /// <see cref="MessageLog"/>.
-        /// </summary>
-        /// <param name="round">The round to check.</param>
-        /// <returns><see langword="true"/> if the count is +1/3,
-        /// otherwise <see langword="false"/>.</returns>
-        private bool HasOneThirdValidators(int round)
-        {
-            return _validatorSet.GetValidatorsPower(_messageLog.GetValidators(round))
-                > _validatorSet.OneThirdPower;
         }
     }
 }

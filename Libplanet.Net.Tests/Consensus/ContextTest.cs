@@ -458,13 +458,14 @@ namespace Libplanet.Net.Tests.Consensus
             var key2 = privateKeys[3];
             var stepChanged = new AsyncAutoResetEvent();
             var prevStep = ConsensusStep.Default;
-            var validatorSet = new ValidatorSet(new[]
-            {
-                new Validator(privateKeys[0].PublicKey, 1),
-                new Validator(proposer.PublicKey, 1),
-                new Validator(key1.PublicKey, 1),
-                new Validator(key2.PublicKey, 1),
-            }.ToList());
+            var validatorSet = new ValidatorSet(
+                new[]
+                {
+                    new Validator(privateKeys[0].PublicKey, 1),
+                    new Validator(proposer.PublicKey, 1),
+                    new Validator(key1.PublicKey, 1),
+                    new Validator(key2.PublicKey, 1),
+                }.ToList());
 
             var (blockChain, context) = TestUtils.CreateDummyContext(
                 privateKey: privateKeys[0],
@@ -495,6 +496,20 @@ namespace Libplanet.Net.Tests.Consensus
                 proposer.PublicKey,
                 codec.Encode(blockA.MarshalBlock()),
                 -1);
+            var preVoteA2 = new ConsensusPreVoteMsg(
+                new VoteMetadata(
+                    1,
+                    0,
+                    blockA.Hash,
+                    DateTimeOffset.UtcNow,
+                    key2.PublicKey,
+                    VoteFlag.PreVote).Sign(key2));
+            var proposalAMsg = new ConsensusProposalMsg(proposalA.Sign(proposer));
+            context.ProduceMessage(proposalAMsg);
+            await stepChanged.WaitAsync();
+            Assert.Equal(ConsensusStep.PreVote, context.Step);
+            context.ProduceMessage(preVoteA2);
+
             var proposalB = new ProposalMetadata(
                 1,
                 0,
@@ -502,47 +517,47 @@ namespace Libplanet.Net.Tests.Consensus
                 proposer.PublicKey,
                 codec.Encode(blockB.MarshalBlock()),
                 -1);
-            var proposalAMsg = new ConsensusProposalMsg(proposalA.Sign(proposer));
             var proposalBMsg = new ConsensusProposalMsg(proposalB.Sign(proposer));
-            context.ProduceMessage(proposalAMsg);
-            await stepChanged.WaitAsync();
-            Assert.Equal(ConsensusStep.PreVote, context.Step);
 
             // Validator 1 (key1) collected +2/3 pre-vote messages,
             // sends maj23 message to context.
-            var maj23 = new ConsensusMaj23Msg(new Maj23Metadata(
-                1,
-                0,
-                blockB.Hash,
-                DateTimeOffset.UtcNow,
-                key1.PublicKey,
-                VoteFlag.PreVote).Sign(key1));
+            var maj23 = new ConsensusMaj23Msg(
+                new Maj23Metadata(
+                    1,
+                    0,
+                    blockB.Hash,
+                    DateTimeOffset.UtcNow,
+                    key1.PublicKey,
+                    VoteFlag.PreVote).Sign(key1));
             context.ProduceMessage(maj23);
 
-            var preVote0 = new ConsensusPreVoteMsg(new VoteMetadata(
-                1,
-                0,
-                blockB.Hash,
-                DateTimeOffset.UtcNow,
-                proposer.PublicKey,
-                VoteFlag.PreVote).Sign(proposer));
-            var preVote1 = new ConsensusPreVoteMsg(new VoteMetadata(
-                1,
-                0,
-                blockB.Hash,
-                DateTimeOffset.UtcNow,
-                key1.PublicKey,
-                VoteFlag.PreVote).Sign(key1));
-            var preVote2 = new ConsensusPreVoteMsg(new VoteMetadata(
-                1,
-                0,
-                blockB.Hash,
-                DateTimeOffset.UtcNow,
-                key2.PublicKey,
-                VoteFlag.PreVote).Sign(key2));
-            context.ProduceMessage(preVote0);
-            context.ProduceMessage(preVote1);
-            context.ProduceMessage(preVote2);
+            var preVoteB0 = new ConsensusPreVoteMsg(
+                new VoteMetadata(
+                    1,
+                    0,
+                    blockB.Hash,
+                    DateTimeOffset.UtcNow,
+                    proposer.PublicKey,
+                    VoteFlag.PreVote).Sign(proposer));
+            var preVoteB1 = new ConsensusPreVoteMsg(
+                new VoteMetadata(
+                    1,
+                    0,
+                    blockB.Hash,
+                    DateTimeOffset.UtcNow,
+                    key1.PublicKey,
+                    VoteFlag.PreVote).Sign(key1));
+            var preVoteB2 = new ConsensusPreVoteMsg(
+                new VoteMetadata(
+                    1,
+                    0,
+                    blockB.Hash,
+                    DateTimeOffset.UtcNow,
+                    key2.PublicKey,
+                    VoteFlag.PreVote).Sign(key2));
+            context.ProduceMessage(preVoteB0);
+            context.ProduceMessage(preVoteB1);
+            context.ProduceMessage(preVoteB2);
             context.ProduceMessage(proposalBMsg);
             await stepChanged.WaitAsync();
             Assert.Equal(ConsensusStep.PreCommit, context.Step);

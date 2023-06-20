@@ -10,8 +10,6 @@ namespace Libplanet.Net.Messages
     /// </summary>
     public abstract class ConsensusMsg : MessageContent, IEquatable<ConsensusMsg>
     {
-        protected const byte Nil = 0x00;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="ConsensusMsg"/> class.
         /// </summary>
@@ -24,7 +22,7 @@ namespace Libplanet.Net.Messages
             PublicKey validatorPublicKey,
             long height,
             int round,
-            BlockHash? blockHash)
+            BlockHash blockHash)
         {
             ValidatorPublicKey = validatorPublicKey;
             Round = round;
@@ -50,7 +48,7 @@ namespace Libplanet.Net.Messages
         /// <summary>
         /// A <see cref="BlockHash"/> the message is written for.
         /// </summary>
-        public BlockHash? BlockHash { get; }
+        public BlockHash BlockHash { get; }
 
         public abstract bool Equals(ConsensusMsg? other);
 
