@@ -30,10 +30,7 @@ namespace Libplanet.Net.Consensus
             context.TimeoutProcessed += (sender, eventArgs) =>
                 TimeoutProcessed?.Invoke(this, (context.Height, eventArgs.Round, eventArgs.Step));
             context.StateChanged += (sender, eventArgs) =>
-                StateChanged?.Invoke(
-                    this,
-                    new Context.ContextState(
-                        eventArgs.VoteCount, eventArgs.Round, eventArgs.Step, eventArgs.Proposal));
+                StateChanged?.Invoke(this, eventArgs);
             context.MessageBroadcasted += (sender, message) =>
                 MessageBroadcasted?.Invoke(this, (context.Height, message));
             context.MessageConsumed += (sender, message) =>

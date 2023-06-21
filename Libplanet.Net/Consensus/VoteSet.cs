@@ -11,6 +11,7 @@ namespace Libplanet.Net.Consensus
 {
     public class VoteSet
     {
+        private readonly ILogger _logger;
         private readonly long _height;
         private readonly int _round;
         private readonly VoteFlag _voteType;
@@ -27,6 +28,11 @@ namespace Libplanet.Net.Consensus
             VoteFlag voteType,
             ValidatorSet validatorSet)
         {
+            _logger = Log
+                .ForContext("Tag", "Consensus")
+                .ForContext("SubTag", "Context")
+                .ForContext<VoteSet>()
+                .ForContext("Source", nameof(VoteSet));
             _height = height;
             _round = round;
             _voteType = voteType;
@@ -46,128 +52,50 @@ namespace Libplanet.Net.Consensus
 
         public int TotalCount => _votesByBlock.Count;
 
-        public bool AddVote(Vote vote)
+        public void AddVote(Vote vote)
         {
             PublicKey validatorKey = vote.ValidatorPublicKey;
 
             if (validatorKey is null)
             {
-                throw new ArgumentException("ValidatorKey of the vote cannot be null");
+                throw new InvalidVoteException("ValidatorKey of the vote cannot be null", vote);
             }
 
             if (!_validatorSet.ContainsPublicKey(validatorKey))
             {
-                return false;
+                throw new InvalidVoteException(
+                    "ValidatorKey of the vote is not in the validator set",
+                    vote);
             }
 
             int validatorIndex = _validatorSet.FindIndex(validatorKey);
             BlockHash blockHash = vote.BlockHash;
 
-            if (vote.Height != _height
-                || vote.Round != _round
-                || vote.Flag != _voteType)
+            if (vote.Height != _height ||
+                vote.Round != _round ||
+                vote.Flag != _voteType)
             {
-                return false;
+                throw new InvalidVoteException(
+                    "Height, round, flag of the vote mismatches",
+                    vote);
             }
 
-            if (vote.Signature.SequenceEqual(GetVote(validatorKey, blockHash)?.Signature))
+            if (GetVote(validatorKey, blockHash) is { })
             {
-                return false;
+                // TODO: Exception segmentation required for the case where vote exists and
+                // signature mismatches.
+                throw new InvalidVoteException("Received vote already exists", vote);
             }
 
             if (!vote.Verify())
             {
-                return false;
+                throw new InvalidVoteException(
+                    "Received vote's signature is invalid",
+                    vote);
             }
 
             // Add vote and get conflicting vote if any.
-            return AddVerifiedVote(vote, blockHash, _validatorSet.GetValidator(validatorKey).Power);
-        }
-
-        public bool AddVerifiedVote(
-            Vote vote,
-            BlockHash blockHash,
-            BigInteger votingPower)
-        {
-            var publicKey = vote.ValidatorPublicKey;
-            Vote? conflicting = null;
-
-            // Already exists in voteSet.votes?
-            if (_votes.ContainsKey(publicKey))
-            {
-                var existing = _votes[publicKey];
-                if (existing.BlockHash.Equals(vote.BlockHash))
-                {
-                    throw new Exception("AddVerifiedVote does not expect duplicate votes");
-                }
-                else
-                {
-                    conflicting = existing;
-                }
-
-                // Replace vote if blockKey matches voteSet.maj23.
-                if (_maj23 is { } maj23NotNull && maj23NotNull.Equals(blockHash))
-                {
-                    _votes[publicKey] = vote;
-                }
-
-                // Otherwise don't add it to voteSet.votes
-            }
-            else
-            {
-                // Add to voteSet.votes and incr .sum
-                _votes[publicKey] = vote;
-            }
-
-            if (_votesByBlock.ContainsKey(blockHash))
-            {
-                if (conflicting is null && !_votesByBlock[blockHash].PeerMaj23)
-                {
-                    // There's a conflict and no peer claims that this block is special.
-                    return false;
-                }
-
-                // We'll add the vote in a bit.
-            }
-            else
-            {
-                // .votesByBlock doesn't exist...
-                if (conflicting != null)
-                {
-                    // ... and there's a conflicting vote.
-                    // We're not even tracking this blockKey, so just forget it.
-                    return false;
-                }
-
-                // ... and there's no conflicting vote.
-                // Start tracking this blockKey
-                _votesByBlock[blockHash] = new BlockVotes();
-
-                // We'll add the vote in a bit.
-            }
-
-            BlockVotes votesByBlock = _votesByBlock[blockHash];
-
-            // Before adding to votesByBlock, see if we'll exceed quorum
-            BigInteger origSum = votesByBlock.Sum;
-            BigInteger quorum = _validatorSet.TwoThirdsPower + 1;
-
-            // Add vote to votesByBlock
-            votesByBlock.AddVerifiedVote(vote, votingPower);
-
-            // If we just crossed the quorum threshold and have 2/3 majority...
-            if (origSum < quorum && quorum <= votesByBlock.Sum && _maj23 is null)
-            {
-                _maj23 = vote.BlockHash;
-
-                // And also copy votes over to voteSet.votes
-                foreach (var pair in votesByBlock.Votes)
-                {
-                    _votes[pair.Key] = pair.Value;
-                }
-            }
-
-            return true;
+            AddVerifiedVote(vote, blockHash, _validatorSet.GetValidator(validatorKey).Power);
         }
 
         public bool Contains(PublicKey publicKey, BlockHash blockHash)
@@ -210,49 +138,47 @@ namespace Libplanet.Net.Consensus
         // this can cause memory issues.
         // TODO: implement ability to remove peers too
         // NOTE: VoteSet must not be nil
-        public void SetPeerMaj23(BoundPeer peer, BlockHash blockHash)
+        public bool SetPeerMaj23(PublicKey publicKey, BlockHash blockHash)
         {
             lock (_lock)
             {
                 // Make sure peer hasn't already told us something.
-                try
+                if (_peerMaj23s.ContainsKey(publicKey))
                 {
-                    BlockHash hash = _peerMaj23s[peer];
+                    BlockHash hash = _peerMaj23s[publicKey];
                     if (hash.Equals(blockHash))
                     {
-                        return;
+                        return false;
                     }
                     else
                     {
-                        throw new ArgumentException(
-                            $"Received conflicting blockID from peer {peer}. ",
-                            $"Expected : {hash}, Actual : {blockHash}");
+                        _logger.Information(
+                            "Received conflicting BlockHash from peer {PublicKey} " +
+                            "(Expected: {Hash}, Actual: {BlockHash})",
+                            publicKey,
+                            hash,
+                            blockHash);
+                        return false;
                     }
                 }
-                catch (KeyNotFoundException)
+
+                _peerMaj23s[publicKey] = blockHash;
+
+                if (!_votesByBlock.ContainsKey(blockHash))
                 {
+                    _votesByBlock[blockHash] = new BlockVotes(blockHash);
                 }
 
-                _peerMaj23s[peer] = blockHash;
-
-                try
+                BlockVotes votesByBlock = _votesByBlock[blockHash];
+                if (votesByBlock.PeerMaj23)
                 {
-                    BlockVotes votesByBlock = _votesByBlock[blockHash];
-                    if (votesByBlock.PeerMaj23)
-                    {
-                        return;
-                    }
-                    else
-                    {
-                        votesByBlock.PeerMaj23 = true;
-                    }
+                    return false;
                 }
-                catch (KeyNotFoundException)
+                else
                 {
-                    _votesByBlock[blockHash] = new BlockVotes();
+                    votesByBlock.PeerMaj23 = true;
+                    return true;
                 }
-
-                return;
             }
         }
 
@@ -285,9 +211,15 @@ namespace Libplanet.Net.Consensus
             => _votes.Values.OrderBy(vote => vote.ValidatorPublicKey.ToAddress()).ToList();
 
         // List returns a copy of the list of votes stored by the VoteSet.
-        public List<Vote?> MappedList()
-            => _validatorSet.PublicKeys.Select(
-                key => _votes.TryGetValue(key, out Vote? vote) ? vote : null).ToList();
+        public List<Vote> MappedList()
+        {
+            if (_maj23 is { } maj23NotNull)
+            {
+                return _votesByBlock[maj23NotNull].MappedList(_height, _round, _validatorSet);
+            }
+
+            throw new NullReferenceException();
+        }
 
         // NOTE: if validator has conflicting votes, returns "canonical" vote
         // Implements VoteSetReader.
@@ -321,6 +253,14 @@ namespace Libplanet.Net.Consensus
             }
 
             return HasTwoThirdsMajority();
+        }
+
+        public bool HasOneThirdsAny()
+        {
+            lock (_lock)
+            {
+                return Sum > _validatorSet.OneThirdPower;
+            }
         }
 
         public bool HasTwoThirdsAny()
@@ -363,17 +303,109 @@ namespace Libplanet.Net.Consensus
             }
 
             return new BlockCommit(
-                _height, _round, _maj23!.Value, _votes.Values.ToImmutableArray());
+                _height, _round, _maj23!.Value, MappedList().ToImmutableArray());
+        }
+
+        internal void AddVerifiedVote(
+            Vote vote,
+            BlockHash blockHash,
+            BigInteger votingPower)
+        {
+            var publicKey = vote.ValidatorPublicKey;
+            Vote? conflicting = null;
+            _logger.Debug("Adding verified vote {Vote}", vote);
+
+            // Already exists in voteSet.votes?
+            if (_votes.ContainsKey(publicKey))
+            {
+                var existing = _votes[publicKey];
+                if (existing.BlockHash.Equals(vote.BlockHash))
+                {
+                    throw new InvalidVoteException(
+                        $"{nameof(AddVerifiedVote)}() does not expect duplicate votes",
+                        vote);
+                }
+                else
+                {
+                    conflicting = existing;
+                }
+
+                // Replace vote if blockKey matches voteSet.maj23.
+                if (_maj23 is { } maj23NotNull && maj23NotNull.Equals(blockHash))
+                {
+                    _votes[publicKey] = vote;
+                }
+
+                // Otherwise don't add it to voteSet.votes
+            }
+            else
+            {
+                // Add to voteSet.votes and incr .sum
+                _votes[publicKey] = vote;
+            }
+
+            if (_votesByBlock.ContainsKey(blockHash))
+            {
+                if (!(conflicting is null) && !_votesByBlock[blockHash].PeerMaj23)
+                {
+                    // There's a conflict and no peer claims that this block is special.
+                    throw new InvalidVoteException(
+                        "There's a conflict and no peer claims that this block is special",
+                        vote);
+                }
+
+                // We'll add the vote in a bit.
+            }
+            else
+            {
+                // .votesByBlock doesn't exist...
+                if (!(conflicting is null))
+                {
+                    // ... and there's a conflicting vote.
+                    // We're not even tracking this blockKey, so just forget it.
+                    throw new InvalidVoteException("There's a conflicting vote", vote);
+                }
+
+                // ... and there's no conflicting vote.
+                // Start tracking this blockKey
+                _votesByBlock[blockHash] = new BlockVotes(blockHash);
+
+                // We'll add the vote in a bit.
+            }
+
+            BlockVotes votesByBlock = _votesByBlock[blockHash];
+
+            // Before adding to votesByBlock, see if we'll exceed quorum
+            BigInteger origSum = votesByBlock.Sum;
+            BigInteger quorum = _validatorSet.TwoThirdsPower + 1;
+
+            // Add vote to votesByBlock
+            votesByBlock.AddVerifiedVote(vote, votingPower);
+
+            // If we just crossed the quorum threshold and have 2/3 majority...
+            if (origSum < quorum && quorum <= votesByBlock.Sum && _maj23 is null)
+            {
+                _maj23 = vote.BlockHash;
+
+                // And also copy votes over to voteSet.votes
+                foreach (var pair in votesByBlock.Votes)
+                {
+                    _votes[pair.Key] = pair.Value;
+                }
+            }
         }
 
         internal class BlockVotes
         {
-            public BlockVotes()
+            public BlockVotes(BlockHash blockHash)
             {
+                BlockHash = blockHash;
                 PeerMaj23 = false;
                 Votes = new Dictionary<PublicKey, Vote>();
                 Sum = BigInteger.Zero;
             }
+
+            public BlockHash BlockHash { get; }
 
             public bool PeerMaj23 { get; set; }
 
@@ -391,6 +423,19 @@ namespace Libplanet.Net.Consensus
                 Votes[vote.ValidatorPublicKey] = vote;
                 Sum += power;
             }
+
+            public List<Vote> MappedList(long height, int round, ValidatorSet validatorSet) =>
+                validatorSet.PublicKeys.Select(
+                        key => Votes.ContainsKey(key)
+                            ? Votes[key]
+                            : new VoteMetadata(
+                                height,
+                                round,
+                                BlockHash,
+                                DateTimeOffset.UtcNow,
+                                key,
+                                VoteFlag.Null).Sign(null))
+                    .ToList();
         }
     }
 }

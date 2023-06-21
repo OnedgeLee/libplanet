@@ -160,12 +160,14 @@ namespace Libplanet.Net.Consensus
             System.Action mutation = await _mutationRequests.Reader.ReadAsync(cancellationToken);
             var prevState = new ContextState(
                 _heightVoteSet.Count,
+                Height,
                 Round,
                 Step,
                 Proposal?.BlockHash);
             mutation();
             var nextState = new ContextState(
                 _heightVoteSet.Count,
+                Height,
                 Round,
                 Step,
                 Proposal?.BlockHash);
@@ -187,12 +189,14 @@ namespace Libplanet.Net.Consensus
                 StateChanged?.Invoke(this, nextState);
                 prevState = new ContextState(
                     _heightVoteSet.Count,
+                    Height,
                     Round,
                     Step,
                     Proposal?.BlockHash);
                 ProcessGenericUponRules();
                 nextState = new ContextState(
                     _heightVoteSet.Count,
+                    Height,
                     Round,
                     Step,
                     Proposal?.BlockHash);
@@ -253,17 +257,21 @@ namespace Libplanet.Net.Consensus
         {
             public ContextState(
                 int voteCount,
+                long height,
                 int round,
                 ConsensusStep step,
                 BlockHash? proposal)
             {
                 VoteCount = voteCount;
+                Height = height;
                 Round = round;
                 Step = step;
                 Proposal = proposal;
             }
 
             public int VoteCount { get; }
+
+            public long Height { get; }
 
             public int Round { get; }
 

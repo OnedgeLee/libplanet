@@ -240,9 +240,7 @@ namespace Libplanet.Net.Consensus
         /// </returns>
         public BlockCommit? GetBlockCommit()
         {
-            var blockCommit = _decision is null
-                ? (BlockCommit?)null
-                : _heightVoteSet.PreCommits(Round).ToBlockCommit();
+            var blockCommit = _heightVoteSet.PreCommits(Round)?.ToBlockCommit();
             _logger.Debug(
                 "{FName}: CommittedRound: {CommittedRound}, Decision: {Decision}, " +
                 "BlockCommit: {BlockCommit}",

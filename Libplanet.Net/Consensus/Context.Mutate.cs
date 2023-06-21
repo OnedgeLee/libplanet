@@ -24,6 +24,7 @@ namespace Libplanet.Net.Consensus
                 Round,
                 ToString());
             Round = round;
+            _heightVoteSet.SetRound(round);
             Proposal = null;
             Step = ConsensusStep.Propose;
             if (_validatorSet.GetProposer(Height, Round).PublicKey == _privateKey.PublicKey)
@@ -79,18 +80,41 @@ namespace Libplanet.Net.Consensus
         {
             try
             {
-                bool added = false;
-                if (message is ConsensusProposalMsg proposal)
+                if (message.Height != Height)
                 {
-                    added = AddProposal(proposal.Proposal);
+                    throw new InvalidConsensusMessageException(
+                        $"Given message's height {message.Height} is invalid",
+                        message);
                 }
-                else if (message is ConsensusPreVoteMsg preVote)
+
+                if (message.Round != Round)
                 {
-                    added = _heightVoteSet.AddVote(preVote.PreVote, message.ValidatorPublicKey);
+                    throw new InvalidConsensusMessageException(
+                        $"Given message's round {message.Round} is invalid",
+                        message);
                 }
-                else if (message is ConsensusPreCommitMsg preCommit)
+
+                if (!_validatorSet.ContainsPublicKey(message.ValidatorPublicKey))
                 {
-                    added = _heightVoteSet.AddVote(preCommit.PreCommit, message.ValidatorPublicKey);
+                    throw new InvalidConsensusMessageException(
+                        $"Given message's validator {message.ValidatorPublicKey} is invalid",
+                        message);
+                }
+
+                switch (message)
+                {
+                    case ConsensusProposalMsg proposal:
+                        AddProposal(proposal.Proposal);
+                        break;
+                    case ConsensusPreVoteMsg preVote:
+                        _heightVoteSet.AddVote(preVote.PreVote);
+                        break;
+                    case ConsensusPreCommitMsg preCommit:
+                        _heightVoteSet.AddVote(preCommit.PreCommit);
+                        break;
+                    case ConsensusMaj23Msg maj23:
+                        _heightVoteSet.SetPeerMaj23(maj23.Maj23);
+                        break;
                 }
 
                 _logger.Debug(
@@ -105,28 +129,74 @@ namespace Libplanet.Net.Consensus
                     message.BlockHash,
                     ToString());
 
-                return added;
+                return true;
+            }
+            catch (InvalidProposalException ipe)
+            {
+                var icme = new InvalidConsensusMessageException(
+                    ipe.Message,
+                    message);
+                var msg = $"Failed to add invalid message {message} to the " +
+                          $"{nameof(HeightVoteSet)} {icme}";
+                _logger.Error(icme, msg);
+                ExceptionOccurred?.Invoke(this, icme);
+                return false;
+            }
+            catch (InvalidVoteException ive)
+            {
+                var icme = new InvalidConsensusMessageException(
+                    ive.Message,
+                    message);
+                var msg = $"Failed to add invalid message {message} to the " +
+                          $"{nameof(HeightVoteSet)} {icme}";
+                _logger.Error(icme, msg);
+                ExceptionOccurred?.Invoke(this, icme);
+                return false;
+            }
+            catch (InvalidMaj23Exception ime)
+            {
+                var icme = new InvalidConsensusMessageException(
+                    ime.Message,
+                    message);
+                var msg = $"Failed to add invalid message {message} to the " +
+                          $"{nameof(HeightVoteSet)} {icme}";
+                _logger.Error(icme, msg);
+                ExceptionOccurred?.Invoke(this, icme);
+                return false;
             }
             catch (InvalidConsensusMessageException icme)
             {
-                _logger.Error(
-                    icme,
-                    $"Failed to add invalid message {{Message}} to the {nameof(HeightVoteSet)}",
-                    message);
+                var msg = $"Failed to add invalid message {message} to the " +
+                          $"{nameof(HeightVoteSet)} {icme}";
+                _logger.Error(icme, msg);
                 ExceptionOccurred?.Invoke(this, icme);
                 return false;
             }
         }
 
-        private bool AddProposal(Proposal proposal)
+        private void AddProposal(Proposal proposal)
         {
+            if (!_validatorSet.GetProposer(Height, Round)
+                    .PublicKey.Equals(proposal.ValidatorPublicKey))
+            {
+                throw new InvalidProposalException(
+                    $"Given proposal's proposer {proposal.ValidatorPublicKey} is not the " +
+                    $"proposer for the current height {Height} and round {Round}",
+                    proposal);
+            }
+
+            // FIXME: Should apply more logic?
             if (Proposal is null)
             {
                 Proposal = proposal;
-                return true;
+                _logger.Debug("Proposal {BlockHash} is set", proposal.BlockHash);
             }
-
-            return false;
+            else
+            {
+                throw new InvalidProposalException(
+                    $"Proposal already exists for height {Height} and round {Round}",
+                    proposal);
+            }
         }
 
         /// <summary>
@@ -241,17 +311,31 @@ namespace Libplanet.Net.Consensus
             }
 
             if (_heightVoteSet.PreVotes(Round).TwoThirdsMajority(out BlockHash hash3) &&
-                hash3.Equals(default) &&
                 Step == ConsensusStep.PreVote)
             {
-                _logger.Debug(
-                    "PreCommit nil for the round {Round} because 2/3+ PreVotes were collected. " +
-                    "(context: {Context})",
-                    Round,
-                    ToString());
-                Step = ConsensusStep.PreCommit;
-                BroadcastMessage(
-                    new ConsensusPreCommitMsg(MakeVote(Round, default, VoteFlag.PreCommit)));
+                if (hash3.Equals(default))
+                {
+                    _logger.Debug(
+                        "PreCommit nil for the round {Round} because 2/3+ PreVotes " +
+                        "were collected. (context: {Context})",
+                        Round,
+                        ToString());
+                    Step = ConsensusStep.PreCommit;
+                    BroadcastMessage(
+                        new ConsensusPreCommitMsg(MakeVote(Round, default, VoteFlag.PreCommit)));
+                }
+                else if (!(Proposal is null) && !hash3.Equals(Proposal.BlockHash))
+                {
+                    // +2/3 votes were collected and is not equal to proposal's,
+                    // remove invalid proposal.
+                    _logger.Debug(
+                        "Remove invalid proposal {Proposal} because 2/3+ PreVotes " +
+                        "for hash {BlockHash} were collected. (context: {Context})",
+                        Round,
+                        hash3,
+                        ToString());
+                    Proposal = null;
+                }
             }
 
             if (_heightVoteSet.PreCommits(Round).HasTwoThirdsAny() &&
@@ -259,7 +343,7 @@ namespace Libplanet.Net.Consensus
             {
                 _logger.Debug(
                     "PreCommit step in round {Round} is scheduled to be timed out because " +
-                    "2/3+ PreCommits are collected for the round. (context: {Context})",
+                    "1/3+ PreCommits are collected for the round. (context: {Context})",
                     Round,
                     ToString());
                 _preCommitTimeoutFlags.Add(Round);
@@ -317,9 +401,10 @@ namespace Libplanet.Net.Consensus
                 {
                     _logger.Error(
                         e,
-                        "Failed to commit block #{Index} {Hash}",
+                        "Failed to commit block #{Index} {Hash} {E}",
                         block4.Index,
-                        block4.Hash);
+                        block4.Hash,
+                        e);
                     ExceptionOccurred?.Invoke(this, e);
                     return;
                 }
@@ -331,9 +416,10 @@ namespace Libplanet.Net.Consensus
                 return;
             }
 
-            // NOTE: +2/3 prevote received, skip round
+            // NOTE: +1/3 prevote received, skip round
+            // FIXME: Tendermint uses +2/3, should fixed?
             if (round > Round &&
-                _heightVoteSet.PreVotes(round).HasTwoThirdsAny())
+                _heightVoteSet.PreVotes(round).HasOneThirdsAny())
             {
                 _logger.Debug(
                     "1/3+ validators from round {Round} > current round {CurrentRound}. " +

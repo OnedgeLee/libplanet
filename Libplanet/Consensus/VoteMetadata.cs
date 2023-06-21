@@ -69,7 +69,7 @@ namespace Libplanet.Consensus
                 blockHash.Equals(default) && (flag == VoteFlag.Null || flag == VoteFlag.Unknown))
             {
                 throw new ArgumentException(
-                    $"Given {nameof(blockHash)} cannot be null if {nameof(flag)} " +
+                    $"Given {nameof(blockHash)} cannot be default if {nameof(flag)} " +
                     $"is {VoteFlag.Null} or {VoteFlag.Unknown}");
             }
 

@@ -476,12 +476,11 @@ namespace Libplanet.Net.Tests.Consensus
             var blockB = blockChain.ProposeBlock(
                 proposer,
                 lastCommit: blockChain.GetBlockCommit(blockChain.Tip.Hash));
-            context.StateChanged += (sender, args) =>
+            context.StateChanged += (sender, state) =>
             {
-                var (_, _, step) = args;
-                if (step != prevStep)
+                if (state.Step != prevStep)
                 {
-                    prevStep = step;
+                    prevStep = state.Step;
                     stepChanged.Set();
                 }
             };
