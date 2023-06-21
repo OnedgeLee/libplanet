@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
 using Libplanet.Blocks;
@@ -41,6 +42,10 @@ namespace Libplanet.Net.Consensus
         public BigInteger Sum => _validatorSet.GetValidatorsPower(
             _votes.Values.Select(vote => vote.ValidatorPublicKey).ToList());
 
+        public int Count => _votes.Count;
+
+        public int TotalCount => _votesByBlock.Count;
+
         public bool AddVote(Vote vote)
         {
             PublicKey validatorKey = vote.ValidatorPublicKey;
@@ -56,7 +61,7 @@ namespace Libplanet.Net.Consensus
             }
 
             int validatorIndex = _validatorSet.FindIndex(validatorKey);
-            BlockHash blockHash = vote.BlockHash ?? default;
+            BlockHash blockHash = vote.BlockHash;
 
             if (vote.Height != _height
                 || vote.Round != _round
@@ -151,25 +156,21 @@ namespace Libplanet.Net.Consensus
             votesByBlock.AddVerifiedVote(vote, votingPower);
 
             // If we just crossed the quorum threshold and have 2/3 majority...
-            if (origSum < quorum && quorum <= votesByBlock.Sum)
+            if (origSum < quorum && quorum <= votesByBlock.Sum && _maj23 is null)
             {
-                // Only consider the first quorum reached
-                if (_maj23 is null)
-                {
-                    _maj23 = vote.BlockHash;
+                _maj23 = vote.BlockHash;
 
-                    // And also copy votes over to voteSet.votes
-                    foreach (var pair in votesByBlock.Votes)
-                    {
-                        _votes[pair.Key] = pair.Value;
-                    }
+                // And also copy votes over to voteSet.votes
+                foreach (var pair in votesByBlock.Votes)
+                {
+                    _votes[pair.Key] = pair.Value;
                 }
             }
 
             return true;
         }
 
-        public bool Contains(PublicKey publicKey, BlockHash? blockHash)
+        public bool Contains(PublicKey publicKey, BlockHash blockHash)
         {
             return _votes.Values.Any(
                 vote => vote.ValidatorPublicKey.Equals(publicKey)
@@ -202,7 +203,7 @@ namespace Libplanet.Net.Consensus
             return null;
         }
 
-        public IEnumerable<Vote> GetVotes(BlockHash? blockHash) => _votes.Values;
+        public IEnumerable<Vote> GetVotes(BlockHash blockHash) => _votes.Values;
 
         // If a peer claims that it has 2/3 majority for given blockKey, call this.
         // NOTE: if there are too many peers, or too much peer churn,
@@ -265,7 +266,7 @@ namespace Libplanet.Net.Consensus
             }
         }
 
-        public bool[]? BitArrayByBlockID(BlockHash blockHash)
+        public bool[] BitArrayByBlockHash(BlockHash blockHash)
         {
             lock (_lock)
             {
@@ -275,21 +276,18 @@ namespace Libplanet.Net.Consensus
                         _votesByBlock[blockHash].Votes.ContainsKey(validator.PublicKey)).ToArray();
                 }
 
-                return null;
+                return _validatorSet.Validators.Select(_ => false).ToArray();
             }
         }
 
         // List returns a copy of the list of votes stored by the VoteSet.
         public List<Vote> List()
-        {
-            var votes = new List<Vote>();
-            foreach (var vote in _votes.Values)
-            {
-                votes.Add(vote);
-            }
+            => _votes.Values.OrderBy(vote => vote.ValidatorPublicKey.ToAddress()).ToList();
 
-            return votes;
-        }
+        // List returns a copy of the list of votes stored by the VoteSet.
+        public List<Vote?> MappedList()
+            => _validatorSet.PublicKeys.Select(
+                key => _votes.TryGetValue(key, out Vote? vote) ? vote : null).ToList();
 
         // NOTE: if validator has conflicting votes, returns "canonical" vote
         // Implements VoteSetReader.
@@ -343,17 +341,29 @@ namespace Libplanet.Net.Consensus
 
         // If there was a +2/3 majority for blockID, return blockID and true.
         // Else, return the empty BlockID{} and false.
-        public (BlockHash, bool) TwoThirdsMajority()
+        public bool TwoThirdsMajority(out BlockHash blockHash)
         {
             lock (_lock)
             {
                 if (_maj23 is { } maj23)
                 {
-                    return (maj23, true);
+                    blockHash = maj23;
+                    return true;
                 }
 
-                return (default(BlockHash), false);
+                return false;
             }
+        }
+
+        public BlockCommit ToBlockCommit()
+        {
+            if (!IsCommit())
+            {
+                throw new Exception();
+            }
+
+            return new BlockCommit(
+                _height, _round, _maj23!.Value, _votes.Values.ToImmutableArray());
         }
 
         internal class BlockVotes

@@ -20,7 +20,7 @@ namespace Libplanet.Consensus
         private static readonly byte[] ValidatorPublicKeyKey = { 0x50 };    // 'P'
         private static readonly byte[] BlockHashKey = { 0x42 };             // 'B'
         private static readonly byte[] FlagKey = { 0x46 };                  // 'F'
-        private static readonly byte[] VotesKey = { 0x56 };                 // 'V'
+        private static readonly byte[] VoteBitsKey = { 0x56 };              // 'V'
 
         private static Codec _codec = new Codec();
 
@@ -31,7 +31,7 @@ namespace Libplanet.Consensus
             DateTimeOffset timestamp,
             PublicKey validatorPublicKey,
             VoteFlag flag,
-            IEnumerable<Vote> votes)
+            IEnumerable<bool> voteBits)
         {
             if (height < 0)
             {
@@ -53,29 +53,13 @@ namespace Libplanet.Consensus
                     nameof(flag));
             }
 
-            var votesArray = votes.ToArray();
-
-            if (votesArray.Any(vote => !vote.BlockHash.Equals(blockHash)))
-            {
-                throw new ArgumentException(
-                    "All votes' BlockHash should be equal to given BlockHash.",
-                    nameof(flag));
-            }
-
-            if (votesArray.Any(vote => vote.Flag != flag))
-            {
-                throw new ArgumentException(
-                    "All votes' VoteFlag should be equal to given VoteFlag.",
-                    nameof(flag));
-            }
-
             Height = height;
             Round = round;
             BlockHash = blockHash;
             Timestamp = timestamp;
             ValidatorPublicKey = validatorPublicKey;
             Flag = flag;
-            Votes = votesArray;
+            VoteBits = voteBits.ToImmutableArray();
         }
 
 #pragma warning disable SA1118 // The parameter spans multiple lines
@@ -91,7 +75,8 @@ namespace Libplanet.Consensus
                 validatorPublicKey: new PublicKey(
                     encoded.GetValue<Binary>(ValidatorPublicKeyKey).ByteArray),
                 flag: (VoteFlag)(int)encoded.GetValue<Integer>(FlagKey).Value,
-                votes: encoded.GetValue<List>(VotesKey).Select(value => new Vote(value)))
+                voteBits: encoded.GetValue<List>(VoteBitsKey)
+                    .Select(bit => (bool)(Bencodex.Types.Boolean)bit))
         {
         }
 #pragma warning restore SA1118
@@ -127,9 +112,9 @@ namespace Libplanet.Consensus
         public VoteFlag Flag { get; }
 
         /// <summary>
-        /// <see cref="Vote"/>s of the vote set.
+        /// <see cref="bool"/>s of the vote set to be .
         /// </summary>
-        public IEnumerable<Vote> Votes { get; }
+        public ImmutableArray<bool> VoteBits { get; }
 
         /// <summary>
         /// A Bencodex-encoded value of <see cref="VoteSetBitsMetadata"/>.
@@ -148,7 +133,9 @@ namespace Libplanet.Consensus
                     .Add(ValidatorPublicKeyKey, ValidatorPublicKey.Format(compress: true))
                     .Add(BlockHashKey, BlockHash.ByteArray)
                     .Add(FlagKey, (int)Flag)
-                    .Add(VotesKey, new List(Votes.Select(vote => vote.Bencoded)));
+                    .Add(
+                        VoteBitsKey,
+                        new List(VoteBits.Select(bit => (Bencodex.Types.Boolean)bit)));
 
                 return encoded;
             }
@@ -180,7 +167,7 @@ namespace Libplanet.Consensus
                             CultureInfo.InvariantCulture)) &&
                 ValidatorPublicKey.Equals(metadata.ValidatorPublicKey) &&
                 Flag == metadata.Flag &&
-                Votes.SequenceEqual(other.Votes);
+                VoteBits.SequenceEqual(other.VoteBits);
         }
 
         /// <inheritdoc/>
@@ -190,9 +177,9 @@ namespace Libplanet.Consensus
         /// <inheritdoc/>
         public override int GetHashCode()
         {
-            int votesHashCode = Votes.Aggregate(
+            int voteBitsHashCode = VoteBits.Aggregate(
                 0,
-                (current, vote) => (current * 397) ^ vote.GetHashCode());
+                (current, voteBit) => (current * 397) ^ voteBit.GetHashCode());
 
             return HashCode.Combine(
                 Height,
@@ -201,7 +188,7 @@ namespace Libplanet.Consensus
                 Timestamp.ToString(TimestampFormat, CultureInfo.InvariantCulture),
                 ValidatorPublicKey,
                 Flag,
-                votesHashCode);
+                voteBitsHashCode);
         }
     }
 }

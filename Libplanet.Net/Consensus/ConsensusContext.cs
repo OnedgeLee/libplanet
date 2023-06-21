@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Libplanet.Blockchain;
@@ -335,17 +334,7 @@ namespace Libplanet.Net.Consensus
                     {
                         // NOTE: Should check if collected messages have same BlockHash with
                         // VoteSetBit's BlockHash?
-                        return _contexts[height]
-                            .GetVoteSetBitsResponse(voteSetBits.Round, voteSetBits.Flag)
-                            .Where(msg => msg is ConsensusProposalMsg ||
-                                          (msg is ConsensusPreVoteMsg preVote &&
-                                           !voteSetBits.Votes.Any(
-                                               vote => vote.ValidatorPublicKey.Equals(
-                                                   preVote.ValidatorPublicKey))) ||
-                                          (msg is ConsensusPreCommitMsg preCommit &&
-                                           !voteSetBits.Votes.Any(
-                                               vote => vote.ValidatorPublicKey.Equals(
-                                                   preCommit.ValidatorPublicKey))));
+                        return _contexts[height].GetVoteSetBitsResponse(voteSetBits);
                     }
                 }
             }
@@ -383,7 +372,7 @@ namespace Libplanet.Net.Consensus
         /// </remarks>
         /// <seealso cref="AttachEventHandlers"/>
         private void OnContextStateChanged(
-            object? sender, (int MessageLogSize, int Round, ConsensusStep Step) e)
+            object? sender, Context.ContextState e)
         {
             if (e.Step == ConsensusStep.EndCommit)
             {

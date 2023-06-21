@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Libplanet.Blocks;
 using Libplanet.Consensus;
+using Libplanet.Crypto;
 using Serilog;
 
 namespace Libplanet.Net.Consensus
@@ -13,7 +14,7 @@ namespace Libplanet.Net.Consensus
         private long _height;
         private ValidatorSet _validatorSet;
         private Dictionary<int, RoundVoteSet> _roundVoteSets;
-        private Dictionary<BoundPeer, List<int>> _peerCatchupRounds;
+        private Dictionary<PublicKey, List<int>> _peerCatchupRounds;
         private int _round;
 
         internal HeightVoteSet(long height, ValidatorSet validatorSet)
@@ -29,11 +30,13 @@ namespace Libplanet.Net.Consensus
                 _height = height;
                 _validatorSet = validatorSet;
                 _roundVoteSets = new Dictionary<int, RoundVoteSet>();
-                _peerCatchupRounds = new Dictionary<BoundPeer, List<int>>();
+                _peerCatchupRounds = new Dictionary<PublicKey, List<int>>();
             }
 
             Reset(height, validatorSet);
         }
+
+        public int Count => _roundVoteSets[_round].Count;
 
         public void Reset(long height, ValidatorSet validatorSet)
         {
@@ -42,7 +45,7 @@ namespace Libplanet.Net.Consensus
                 _height = height;
                 _validatorSet = validatorSet;
                 _roundVoteSets = new Dictionary<int, RoundVoteSet>();
-                _peerCatchupRounds = new Dictionary<BoundPeer, List<int>>();
+                _peerCatchupRounds = new Dictionary<PublicKey, List<int>>();
 
                 AddRound(0);
                 _round = 0;
@@ -70,6 +73,7 @@ namespace Libplanet.Net.Consensus
         {
             lock (_lock)
             {
+                // FIXME: This shouldn't be _round + 1?
                 var newRound = _round - 1;
                 if (_round != 0 && (round < newRound))
                 {
@@ -85,6 +89,8 @@ namespace Libplanet.Net.Consensus
 
                     AddRound(r);
                 }
+
+                _round = round;
             }
         }
 
@@ -102,7 +108,7 @@ namespace Libplanet.Net.Consensus
 
         // Duplicate votes return added=false, err=nil.
         // By convention, peerID is "" if origin is self.
-        public bool AddVote(Vote vote, BoundPeer peer)
+        public bool AddVote(Vote vote, PublicKey publicKey)
         {
             lock (_lock)
             {
@@ -116,19 +122,23 @@ namespace Libplanet.Net.Consensus
 
                 if (voteSet is null)
                 {
-                    List<int> rounds = _peerCatchupRounds[peer];
+                    if (_peerCatchupRounds.ContainsKey(publicKey))
+                    {
+                        _peerCatchupRounds[publicKey] = new List<int>();
+                    }
+
+                    List<int> rounds = _peerCatchupRounds[publicKey];
                     if (rounds.Count < 2)
                     {
                         AddRound(vote.Round);
-
-                        // TODO : Duplicated line, have to be investigated later
                         voteSet = GetVoteSet(vote.Round, vote.Flag);
                         rounds.Add(vote.Round);
-                        _peerCatchupRounds[peer] = rounds;
+                        _peerCatchupRounds[publicKey] = rounds;
                     }
                     else
                     {
-                        throw new ArgumentException("Got vote from unwanted round");
+                        _logger.Information("Got vote from unwanted round");
+                        return false;
                     }
                 }
 
@@ -161,7 +171,7 @@ namespace Libplanet.Net.Consensus
                 for (int r = _round; r >= 0; r--)
                 {
                     VoteSet voteSet = GetVoteSet(r, VoteFlag.PreVote);
-                    (BlockHash polBlockHash, bool exists) = voteSet.TwoThirdsMajority();
+                    bool exists = voteSet.TwoThirdsMajority(out BlockHash polBlockHash);
                     if (exists)
                     {
                         return (r, polBlockHash);
@@ -220,6 +230,8 @@ namespace Libplanet.Net.Consensus
             public VoteSet PreVotes { get; set; }
 
             public VoteSet PreCommits { get; set; }
+
+            public int Count => PreVotes.Count + PreCommits.Count;
         }
     }
 }

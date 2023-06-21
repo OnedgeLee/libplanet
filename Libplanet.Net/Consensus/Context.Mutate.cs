@@ -24,6 +24,7 @@ namespace Libplanet.Net.Consensus
                 Round,
                 ToString());
             Round = round;
+            Proposal = null;
             Step = ConsensusStep.Propose;
             if (_validatorSet.GetProposer(Height, Round).PublicKey == _privateKey.PublicKey)
             {
@@ -70,36 +71,62 @@ namespace Libplanet.Net.Consensus
         /// an <see cref="InvalidConsensusMessageException"/> and handles it <em>internally</em>
         /// while invoking <see cref="ExceptionOccurred"/> event.
         /// An <see cref="InvalidConsensusMessageException"/> can be thrown when
-        /// the internal <see cref="MessageLog"/> does not accept it, i.e.
-        /// <see cref="MessageLog.Add"/> returns <see langword="false"/>.
+        /// the internal <see cref="HeightVoteSet"/> does not accept it, i.e.
+        /// <see cref="HeightVoteSet.AddVote"/> returns <see langword="false"/>.
         /// </remarks>
-        /// <seealso cref="MessageLog.Add"/>
-        private void AddMessage(ConsensusMsg message)
+        /// <seealso cref="HeightVoteSet.AddVote"/>
+        private bool AddMessage(ConsensusMsg message)
         {
             try
             {
-                _messageLog.Add(message);
+                bool added = false;
+                if (message is ConsensusProposalMsg proposal)
+                {
+                    added = AddProposal(proposal.Proposal);
+                }
+                else if (message is ConsensusPreVoteMsg preVote)
+                {
+                    added = _heightVoteSet.AddVote(preVote.PreVote, message.ValidatorPublicKey);
+                }
+                else if (message is ConsensusPreCommitMsg preCommit)
+                {
+                    added = _heightVoteSet.AddVote(preCommit.PreCommit, message.ValidatorPublicKey);
+                }
+
                 _logger.Debug(
                     "{FName}: Message: {Message} => Height: {Height}, Round: {Round}, " +
                     "Validator Address: {VAddress}, " +
-                    "Hash: {BlockHash}, MessageCount: {Count}. (context: {Context})",
+                    "Hash: {BlockHash}. (context: {Context})",
                     nameof(AddMessage),
                     message,
                     message.Height,
                     message.Round,
                     message.ValidatorPublicKey.ToAddress(),
                     message.BlockHash,
-                    _messageLog.GetTotalCount(),
                     ToString());
+
+                return added;
             }
             catch (InvalidConsensusMessageException icme)
             {
                 _logger.Error(
                     icme,
-                    $"Failed to add invalid message {{Message}} to the {nameof(MessageLog)}",
+                    $"Failed to add invalid message {{Message}} to the {nameof(HeightVoteSet)}",
                     message);
                 ExceptionOccurred?.Invoke(this, icme);
+                return false;
             }
+        }
+
+        private bool AddProposal(Proposal proposal)
+        {
+            if (Proposal is null)
+            {
+                Proposal = proposal;
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -113,7 +140,7 @@ namespace Libplanet.Net.Consensus
                 return;
             }
 
-            (Block Block, int ValidRound)? propose = GetProposal(Round);
+            (Block Block, int ValidRound)? propose = GetProposal();
             if (propose is { } p1 &&
                 p1.ValidRound == -1 &&
                 Step == ConsensusStep.Propose)
@@ -132,15 +159,15 @@ namespace Libplanet.Net.Consensus
                 else
                 {
                     BroadcastMessage(
-                        new ConsensusPreVoteMsg(MakeVote(Round, null, VoteFlag.PreVote)));
+                        new ConsensusPreVoteMsg(MakeVote(Round, default, VoteFlag.PreVote)));
                 }
             }
 
             if (propose is { } p2 &&
                 p2.ValidRound >= 0 &&
                 p2.ValidRound < Round &&
-                _messageLog.HasTwoThirdsPreVote(
-                    p2.ValidRound, preVote => p2.Block.Hash.Equals(preVote.BlockHash)) &&
+                _heightVoteSet.PreVotes(p2.ValidRound).TwoThirdsMajority(out BlockHash hash1) &&
+                hash1.Equals(p2.Block.Hash) &&
                 Step == ConsensusStep.Propose)
             {
                 _logger.Debug(
@@ -158,23 +185,12 @@ namespace Libplanet.Net.Consensus
                 }
                 else
                 {
-                    if (_messageLog.PeerMaj23(Round, p2.Block.Hash))
-                    {
-                        // If there are +2/3 validators claim that the block is valid
-                        // and have collected +2/3 pre-votes,
-                        // reset lock and enter pre-commit state.
-                        _lockedRound = -1;
-                        _lockedValue = null;
-                    }
-                    else
-                    {
-                        BroadcastMessage(
-                            new ConsensusPreVoteMsg(MakeVote(Round, null, VoteFlag.PreVote)));
-                    }
+                    BroadcastMessage(
+                        new ConsensusPreVoteMsg(MakeVote(Round, default, VoteFlag.PreVote)));
                 }
             }
 
-            if (_messageLog.HasTwoThirdsPreVote(Round, _ => true) &&
+            if (_heightVoteSet.PreVotes(Round).HasTwoThirdsAny() &&
                 Step == ConsensusStep.PreVote &&
                 !_preVoteTimeoutFlags.Contains(Round))
             {
@@ -188,8 +204,8 @@ namespace Libplanet.Net.Consensus
             }
 
             if (propose is { } p3 &&
-                _messageLog.HasTwoThirdsPreVote(
-                    Round, preVote => p3.Block.Hash.Equals(preVote.BlockHash)) &&
+                _heightVoteSet.PreVotes(Round).TwoThirdsMajority(out BlockHash hash2) &&
+                hash2.Equals(p3.Block.Hash) &&
                 IsValid(p3.Block, out _) &&
                 (Step == ConsensusStep.PreVote || Step == ConsensusStep.PreCommit) &&
                 !_hasTwoThirdsPreVoteFlags.Contains(Round))
@@ -224,7 +240,8 @@ namespace Libplanet.Net.Consensus
                 _validRound = Round;
             }
 
-            if (_messageLog.HasTwoThirdsPreVote(Round, preVote => preVote.BlockHash is null) &&
+            if (_heightVoteSet.PreVotes(Round).TwoThirdsMajority(out BlockHash hash3) &&
+                hash3.Equals(default) &&
                 Step == ConsensusStep.PreVote)
             {
                 _logger.Debug(
@@ -234,10 +251,10 @@ namespace Libplanet.Net.Consensus
                     ToString());
                 Step = ConsensusStep.PreCommit;
                 BroadcastMessage(
-                    new ConsensusPreCommitMsg(MakeVote(Round, null, VoteFlag.PreCommit)));
+                    new ConsensusPreCommitMsg(MakeVote(Round, default, VoteFlag.PreCommit)));
             }
 
-            if (_messageLog.HasTwoThirdsPreCommit(Round, preCommit => true) &&
+            if (_heightVoteSet.PreCommits(Round).HasTwoThirdsAny() &&
                 !_preCommitTimeoutFlags.Contains(Round))
             {
                 _logger.Debug(
@@ -266,9 +283,9 @@ namespace Libplanet.Net.Consensus
 
             int round = message.Round;
             if ((message is ConsensusProposalMsg || message is ConsensusPreCommitMsg) &&
-                GetProposal(round) is (Block block4, _) &&
-                _messageLog.HasTwoThirdsPreCommit(
-                    round, preCommit => block4.Hash.Equals(preCommit.BlockHash)) &&
+                GetProposal() is (Block block4, _) &&
+                _heightVoteSet.PreCommits(Round).TwoThirdsMajority(out BlockHash hash) &&
+                block4.Hash.Equals(hash) &&
                 IsValid(block4, out _))
             {
                 Step = ConsensusStep.EndCommit;
@@ -314,8 +331,9 @@ namespace Libplanet.Net.Consensus
                 return;
             }
 
+            // NOTE: +2/3 prevote received, skip round
             if (round > Round &&
-                HasOneThirdValidators(round))
+                _heightVoteSet.PreVotes(round).HasTwoThirdsAny())
             {
                 _logger.Debug(
                     "1/3+ validators from round {Round} > current round {CurrentRound}. " +
@@ -338,7 +356,7 @@ namespace Libplanet.Net.Consensus
             if (round == Round && Step == ConsensusStep.Propose)
             {
                 BroadcastMessage(
-                    new ConsensusPreVoteMsg(MakeVote(Round, null, VoteFlag.PreVote)));
+                    new ConsensusPreVoteMsg(MakeVote(Round, default, VoteFlag.PreVote)));
                 Step = ConsensusStep.PreVote;
                 TimeoutProcessed?.Invoke(this, (round, ConsensusStep.Propose));
             }
@@ -355,7 +373,7 @@ namespace Libplanet.Net.Consensus
             if (round == Round && Step == ConsensusStep.PreVote)
             {
                 BroadcastMessage(
-                    new ConsensusPreCommitMsg(MakeVote(Round, null, VoteFlag.PreCommit)));
+                    new ConsensusPreCommitMsg(MakeVote(Round, default, VoteFlag.PreCommit)));
                 Step = ConsensusStep.PreCommit;
                 TimeoutProcessed?.Invoke(this, (round, ConsensusStep.PreVote));
             }

@@ -12,11 +12,7 @@ namespace Libplanet.Net.Consensus
         internal event EventHandler<(long Height, int Round, ConsensusStep Step)>? TimeoutProcessed;
 
         /// <inheritdoc cref="Context.StateChanged"/>
-        internal event EventHandler<(
-            long Height,
-            int MessageLogSize,
-            int Round,
-            ConsensusStep Step)>? StateChanged;
+        internal event EventHandler<Context.ContextState>? StateChanged;
 
         /// <inheritdoc cref="Context.MessageBroadcasted"/>
         internal event EventHandler<(long Height, ConsensusMsg Message)>? MessageBroadcasted;
@@ -36,7 +32,8 @@ namespace Libplanet.Net.Consensus
             context.StateChanged += (sender, eventArgs) =>
                 StateChanged?.Invoke(
                     this,
-                    (context.Height, eventArgs.MessageLogSize, eventArgs.Round, eventArgs.Step));
+                    new Context.ContextState(
+                        eventArgs.VoteCount, eventArgs.Round, eventArgs.Step, eventArgs.Proposal));
             context.MessageBroadcasted += (sender, message) =>
                 MessageBroadcasted?.Invoke(this, (context.Height, message));
             context.MessageConsumed += (sender, message) =>

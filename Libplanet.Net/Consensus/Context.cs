@@ -84,7 +84,7 @@ namespace Libplanet.Net.Consensus
         private readonly ValidatorSet _validatorSet;
         private readonly Channel<ConsensusMsg> _messageRequests;
         private readonly Channel<System.Action> _mutationRequests;
-        private readonly MessageLog _messageLog;
+        private readonly HeightVoteSet _heightVoteSet;
 
         private readonly PrivateKey _privateKey;
         private readonly HashSet<int> _preVoteTimeoutFlags;
@@ -182,7 +182,7 @@ namespace Libplanet.Net.Consensus
             _codec = new Codec();
             _messageRequests = Channel.CreateUnbounded<ConsensusMsg>();
             _mutationRequests = Channel.CreateUnbounded<System.Action>();
-            _messageLog = new MessageLog(height, validators);
+            _heightVoteSet = new HeightVoteSet(height, validators);
             _preVoteTimeoutFlags = new HashSet<int>();
             _hasTwoThirdsPreVoteFlags = new HashSet<int>();
             _preCommitTimeoutFlags = new HashSet<int>();
@@ -216,7 +216,7 @@ namespace Libplanet.Net.Consensus
         /// </summary>
         public ConsensusStep Step { get; private set; }
 
-        public Proposal Proposal { get; private set; }
+        public Proposal? Proposal { get; private set; }
 
         /// <summary>
         /// A command class for receiving <see cref="ConsensusMsg"/> from or broadcasts to other
@@ -242,7 +242,7 @@ namespace Libplanet.Net.Consensus
         {
             var blockCommit = _decision is null
                 ? (BlockCommit?)null
-                : _messageLog.GetBlockCommit(_committedRound, _decision.Hash);
+                : _heightVoteSet.PreCommits(Round).ToBlockCommit();
             _logger.Debug(
                 "{FName}: CommittedRound: {CommittedRound}, Decision: {Decision}, " +
                 "BlockCommit: {BlockCommit}",
@@ -255,14 +255,11 @@ namespace Libplanet.Net.Consensus
 
         public VoteSetBits GetVoteSetBits(int round, BlockHash blockHash, VoteFlag flag)
         {
-            var votes = flag switch
+            bool[] voteBits = flag switch
             {
-                VoteFlag.PreVote => _messageLog.GetPreVotes(round)
-                    .Where(msg => msg.BlockHash.Equals(blockHash))
-                    .Select(msg => msg.PreVote),
-                VoteFlag.PreCommit => _messageLog.GetPreCommits(round)
-                    .Where(msg => msg.BlockHash.Equals(blockHash))
-                    .Select(msg => msg.PreCommit),
+                VoteFlag.PreVote => _heightVoteSet.PreVotes(round).BitArrayByBlockHash(blockHash),
+                VoteFlag.PreCommit
+                    => _heightVoteSet.PreCommits(round).BitArrayByBlockHash(blockHash),
                 _ => throw new ArgumentException(
                     "VoteFlag should be either PreVote or PreCommit.",
                     nameof(flag)),
@@ -275,26 +272,33 @@ namespace Libplanet.Net.Consensus
                 DateTimeOffset.UtcNow,
                 _privateKey.PublicKey,
                 flag,
-                votes).Sign(_privateKey);
+                voteBits).Sign(_privateKey);
         }
 
-        public IEnumerable<ConsensusMsg> GetVoteSetBitsResponse(int round, VoteFlag flag)
+        public IEnumerable<ConsensusMsg> GetVoteSetBitsResponse(VoteSetBits voteSetBits)
         {
-            // TODO: Add appropriate exception for this.
-            var proposal = _messageLog.GetProposal(round) ??
-                           throw new Exception($"No proposal for round {round}");
-            IEnumerable<ConsensusMsg> votes = flag switch
+            IEnumerable<Vote> votes = voteSetBits.Flag switch
             {
-                VoteFlag.PreVote => _messageLog.GetPreVotes(round),
-                VoteFlag.PreCommit => _messageLog.GetPreCommits(round),
+                VoteFlag.PreVote =>
+                _heightVoteSet.PreVotes(voteSetBits.Round).MappedList().Where(
+                    (vote, index)
+                    => voteSetBits.VoteBits[index] && vote is { }).Select(vote => vote!),
+                VoteFlag.PreCommit =>
+                _heightVoteSet.PreCommits(voteSetBits.Round).MappedList().Where(
+                    (vote, index)
+                    => voteSetBits.VoteBits[index] && vote is { }).Select(vote => vote!),
                 _ => throw new ArgumentException(
                     "VoteFlag should be PreVote or PreCommit.",
-                    nameof(flag)),
+                    nameof(voteSetBits.Flag)),
             };
 
-            var list = votes.ToList();
-            list.Insert(0, proposal);
-            return list;
+            return votes.Select(
+                vote => vote.Flag switch
+            {
+                VoteFlag.PreVote => (ConsensusMsg)new ConsensusPreVoteMsg(vote),
+                VoteFlag.PreCommit => (ConsensusMsg)new ConsensusPreCommitMsg(vote),
+                _ => throw new ArgumentException(),
+            });
         }
 
         /// <summary>
@@ -310,6 +314,7 @@ namespace Libplanet.Net.Consensus
                 { "height", Height },
                 { "round", Round },
                 { "step", Step.ToString() },
+                { "proposal", Proposal?.ToString() ?? "null" },
                 { "locked_value", _lockedValue?.Hash.ToString() ?? "null" },
                 { "locked_round", _lockedRound },
                 { "valid_value", _validValue?.Hash.ToString() ?? "null" },
@@ -493,7 +498,7 @@ namespace Libplanet.Net.Consensus
         /// <returns>Returns a signed <see cref="Vote"/> with consensus private key.</returns>
         /// <exception cref="ArgumentException">If <paramref name="flag"/> is either
         /// <see cref="VoteFlag.Null"/> or <see cref="VoteFlag.Unknown"/>.</exception>
-        private Vote MakeVote(int round, BlockHash? hash, VoteFlag flag)
+        private Vote MakeVote(int round, BlockHash hash, VoteFlag flag)
         {
             if (flag == VoteFlag.Null || flag == VoteFlag.Unknown)
             {
@@ -545,18 +550,16 @@ namespace Libplanet.Net.Consensus
         /// <summary>
         /// Gets the proposed block and valid round of the given round.
         /// </summary>
-        /// <param name="round">A round to get.</param>
         /// <returns>Returns a tuple of proposer and valid round.  If proposal for the round
         /// does not exist, returns <see langword="null"/> instead.
         /// </returns>
-        private (Block, int)? GetProposal(int round)
+        private (Block, int)? GetProposal()
         {
-            ConsensusProposalMsg? proposal = _messageLog.GetProposal(round);
-            if (proposal is { } p)
+            if (Proposal is { } p)
             {
                 var block = BlockMarshaler.UnmarshalBlock(
-                    (Dictionary)_codec.Decode(p.Proposal.MarshaledBlock));
-                return (block, p.Proposal.ValidRound);
+                    (Dictionary)_codec.Decode(p.MarshaledBlock));
+                return (block, p.ValidRound);
             }
 
             return null;

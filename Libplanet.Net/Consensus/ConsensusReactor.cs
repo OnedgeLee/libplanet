@@ -160,16 +160,18 @@ namespace Libplanet.Net.Consensus
         {
             switch (content)
             {
+#pragma warning disable S125
+                /*
                 case ConsensusVoteSetBitsMsg voteSetBits:
                     // Note: ConsensusVoteSetBitsMsg will not be stored to context's message log.
-                    var messages = _consensusContext.HandleVoteSetBits(voteSetBits.VoteSetBits);
+                    var messages = _consensusContext.HandleVoteSetBits(voteSetBits.VoteSetBits)
                     try
                     {
                         var sender = _gossip.Peers.First(
-                            peer => peer.PublicKey.Equals(voteSetBits.ValidatorPublicKey));
+                            peer => peer.PublicKey.Equals(voteSetBits.ValidatorPublicKey))
                         foreach (var msg in messages)
                         {
-                            _gossip.PublishMessage(msg, new[] { sender });
+                            _gossip.PublishMessage(msg, new[] { sender })
                         }
                     }
                     catch (InvalidOperationException)
@@ -177,11 +179,12 @@ namespace Libplanet.Net.Consensus
                         _logger.Debug(
                             "Cannot respond received ConsensusVoteSetBitsMsg message" +
                             " {Message} since there is no corresponding peer in the table",
-                            voteSetBits);
+                            voteSetBits)
                     }
 
-                    break;
-
+                    break
+                */
+#pragma warning restore S125
                 case ConsensusMaj23Msg maj23Msg:
                     try
                     {

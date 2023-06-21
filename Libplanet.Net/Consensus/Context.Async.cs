@@ -114,11 +114,12 @@ namespace Libplanet.Net.Consensus
                     ExceptionOccurred?.Invoke(this, oce);
                     throw;
                 }
-
-                if (_messageLog.GetRandomMessage() is { } message)
+#pragma warning disable S125
+                /*if (_heightVoteSet.GetRandomMessage() is { } message)
                 {
-                    BroadcastMessage(message);
-                }
+                    BroadcastMessage(message)
+                }*/
+#pragma warning restore S125
             }
         }
 
@@ -145,10 +146,7 @@ namespace Libplanet.Net.Consensus
             ConsensusMsg message = await _messageRequests.Reader.ReadAsync(cancellationToken);
             ProduceMutation(() =>
             {
-                int prevMessageLogSize = _messageLog.GetTotalCount();
-                AddMessage(message);
-                int nextMessageLogSize = _messageLog.GetTotalCount();
-                if (prevMessageLogSize < nextMessageLogSize)
+                if (AddMessage(message))
                 {
                     ProcessHeightOrRoundUponRules(message);
                 }
@@ -161,41 +159,43 @@ namespace Libplanet.Net.Consensus
         {
             System.Action mutation = await _mutationRequests.Reader.ReadAsync(cancellationToken);
             var prevState = new ContextState(
-                _messageLog.GetTotalCount(),
+                _heightVoteSet.Count,
                 Round,
                 Step,
-                GetProposal(Round)?.Item1.Hash);
+                Proposal?.BlockHash);
             mutation();
             var nextState = new ContextState(
-                _messageLog.GetTotalCount(),
+                _heightVoteSet.Count,
                 Round,
                 Step,
-                GetProposal(Round)?.Item1.Hash);
+                Proposal?.BlockHash);
             while (!prevState.Equals(nextState))
             {
                 _logger.Information(
-                    "State (MessageLogSize, Round, Step) changed from " +
-                    "({PrevMessageLogSize}, {PrevRound}, {PrevStep}) to " +
-                    "({NextMessageLogSize}, {NextRound}, {NextStep})",
-                    prevState.MessageLogSize,
+                    "State (Proposal, VoteCount, Round, Step) " +
+                    "changed from " +
+                    "({PrevProposal}, {PrevVoteCount}, {PrevRound}, {PrevStep}) to " +
+                    "({NextProposal}, {NextVoteCount}, {NextRound}, {NextStep})",
+                    prevState.Proposal?.ToString() ?? "Null",
+                    prevState.VoteCount,
                     prevState.Round,
                     prevState.Step,
-                    nextState.MessageLogSize,
+                    nextState.Proposal?.ToString() ?? "Null",
+                    nextState.VoteCount,
                     nextState.Round,
                     nextState.Step);
-                StateChanged?.Invoke(
-                    this, (nextState.MessageLogSize, nextState.Round, nextState.Step));
+                StateChanged?.Invoke(this, nextState);
                 prevState = new ContextState(
-                    _messageLog.GetTotalCount(),
+                    _heightVoteSet.Count,
                     Round,
                     Step,
-                    GetProposal(Round)?.Item1.Hash);
+                    Proposal?.BlockHash);
                 ProcessGenericUponRules();
                 nextState = new ContextState(
-                    _messageLog.GetTotalCount(),
+                    _heightVoteSet.Count,
                     Round,
                     Step,
-                    GetProposal(Round)?.Item1.Hash);
+                    Proposal?.BlockHash);
             }
 
             MutationConsumed?.Invoke(this, mutation);
@@ -249,21 +249,21 @@ namespace Libplanet.Net.Consensus
             ProduceMutation(() => ProcessTimeoutPreCommit(round));
         }
 
-        private struct ContextState : IEquatable<ContextState>
+        internal struct ContextState : IEquatable<ContextState>
         {
             public ContextState(
-                int messageLogSize,
+                int voteCount,
                 int round,
                 ConsensusStep step,
                 BlockHash? proposal)
             {
-                MessageLogSize = messageLogSize;
+                VoteCount = voteCount;
                 Round = round;
                 Step = step;
                 Proposal = proposal;
             }
 
-            public int MessageLogSize { get; }
+            public int VoteCount { get; }
 
             public int Round { get; }
 
@@ -273,7 +273,7 @@ namespace Libplanet.Net.Consensus
 
             public bool Equals(ContextState other)
             {
-                return MessageLogSize == other.MessageLogSize &&
+                return VoteCount == other.VoteCount &&
                        Round == other.Round &&
                        Step == other.Step &&
                        Proposal.Equals(other.Proposal);
@@ -286,7 +286,7 @@ namespace Libplanet.Net.Consensus
 
             public override int GetHashCode()
             {
-                return HashCode.Combine(MessageLogSize, Round, (int)Step, Proposal.GetHashCode());
+                return HashCode.Combine(VoteCount, Round, (int)Step, Proposal.GetHashCode());
             }
         }
     }
