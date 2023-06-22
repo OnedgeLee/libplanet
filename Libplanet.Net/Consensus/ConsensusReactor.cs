@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Libplanet.Blockchain;
+using Libplanet.Consensus;
 using Libplanet.Crypto;
 using Libplanet.Net.Messages;
 using Libplanet.Net.Transports;
@@ -160,18 +161,16 @@ namespace Libplanet.Net.Consensus
         {
             switch (content)
             {
-#pragma warning disable S125
-                /*
                 case ConsensusVoteSetBitsMsg voteSetBits:
                     // Note: ConsensusVoteSetBitsMsg will not be stored to context's message log.
-                    var messages = _consensusContext.HandleVoteSetBits(voteSetBits.VoteSetBits)
+                    var messages = _consensusContext.HandleVoteSetBits(voteSetBits.VoteSetBits);
                     try
                     {
                         var sender = _gossip.Peers.First(
-                            peer => peer.PublicKey.Equals(voteSetBits.ValidatorPublicKey))
+                            peer => peer.PublicKey.Equals(voteSetBits.ValidatorPublicKey));
                         foreach (var msg in messages)
                         {
-                            _gossip.PublishMessage(msg, new[] { sender })
+                            _gossip.PublishMessage(msg, new[] { sender });
                         }
                     }
                     catch (InvalidOperationException)
@@ -179,27 +178,27 @@ namespace Libplanet.Net.Consensus
                         _logger.Debug(
                             "Cannot respond received ConsensusVoteSetBitsMsg message" +
                             " {Message} since there is no corresponding peer in the table",
-                            voteSetBits)
+                            voteSetBits);
                     }
 
-                    break
-                */
-#pragma warning restore S125
+                    break;
                 case ConsensusMaj23Msg maj23Msg:
                     try
                     {
-                        var sender = _gossip.Peers.First(
-                        peer => peer.PublicKey.Equals(maj23Msg.ValidatorPublicKey));
-                        var reply = _consensusContext.HandleMaj23(maj23Msg);
-                        if (reply is null)
+                        if (_consensusContext.HandleMessage(maj23Msg))
                         {
-                            // Reply is not needed. Ignore the message.
-                            break;
-                        }
+                            VoteSetBits voteSetBits = _consensusContext.Contexts[maj23Msg.Height]
+                                .GetVoteSetBits(
+                                    maj23Msg.Round,
+                                    maj23Msg.BlockHash,
+                                    maj23Msg.Maj23.Flag);
+                            var sender = _gossip.Peers.First(
+                                peer => peer.PublicKey.Equals(maj23Msg.ValidatorPublicKey));
 
-                        _gossip.PublishMessage(
-                            new ConsensusVoteSetBitsMsg(reply),
-                            new[] { sender });
+                            _gossip.PublishMessage(
+                                new ConsensusVoteSetBitsMsg(voteSetBits),
+                                new[] { sender });
+                        }
                     }
                     catch (InvalidOperationException)
                     {

@@ -280,11 +280,11 @@ namespace Libplanet.Net.Consensus
                 VoteFlag.PreVote =>
                 _heightVoteSet.PreVotes(voteSetBits.Round).MappedList().Where(
                     (vote, index)
-                    => voteSetBits.VoteBits[index] && vote is { }).Select(vote => vote!),
+                    => !voteSetBits.VoteBits[index] && vote is { }).Select(vote => vote!),
                 VoteFlag.PreCommit =>
                 _heightVoteSet.PreCommits(voteSetBits.Round).MappedList().Where(
                     (vote, index)
-                    => voteSetBits.VoteBits[index] && vote is { }).Select(vote => vote!),
+                    => !voteSetBits.VoteBits[index] && vote is { }).Select(vote => vote!),
                 _ => throw new ArgumentException(
                     "VoteFlag should be PreVote or PreCommit.",
                     nameof(voteSetBits.Flag)),

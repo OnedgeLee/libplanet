@@ -222,22 +222,21 @@ namespace Libplanet.Net.Consensus
         // NOTE: if there are too many peers, or too much peer churn,
         // this can cause memory issues.
         // TODO: implement ability to remove peers too
-        public void SetPeerMaj23(
-            int round,
-            VoteFlag voteFlag,
-            BoundPeer peer,
-            BlockHash blockHash)
+        public bool SetPeerMaj23(Maj23 maj23)
         {
             lock (_lock)
             {
-                if (!voteFlag.Equals(VoteFlag.PreVote)
-                    && !voteFlag.Equals(VoteFlag.PreCommit))
+                if (!maj23.Flag.Equals(VoteFlag.PreVote) &&
+                    !maj23.Flag.Equals(VoteFlag.PreCommit))
                 {
-                    throw new ArgumentException($"Invalid vote type {voteFlag}");
+                    throw new InvalidMaj23Exception(
+                        $"Maj23 must have either {VoteFlag.PreVote} or {VoteFlag.PreCommit} " +
+                        $"(Actual: {maj23.Flag})",
+                        maj23);
                 }
 
-                VoteSet voteSet = GetVoteSet(round, voteFlag);
-                voteSet.SetPeerMaj23(peer, blockHash);
+                VoteSet voteSet = GetVoteSet(maj23.Round, maj23.Flag);
+                return voteSet.SetPeerMaj23(maj23);
             }
         }
 
@@ -253,7 +252,7 @@ namespace Libplanet.Net.Consensus
 
             public VoteSet PreCommits { get; set; }
 
-            public int Count => PreVotes.Count + PreCommits.Count;
+            public int Count => PreVotes.TotalCount + PreCommits.TotalCount;
         }
     }
 }

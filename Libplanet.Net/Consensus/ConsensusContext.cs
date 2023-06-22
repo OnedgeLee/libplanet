@@ -269,44 +269,6 @@ namespace Libplanet.Net.Consensus
         }
 
         /// <summary>
-        /// Handles a received <see cref="Maj23"/> and return message to fetch.
-        /// </summary>
-        /// <param name="maj23">The <see cref="Maj23"/> received from any validator.
-        /// </param>
-        /// <returns>
-        /// A nullable <see cref="VoteSetBits"/> to reply back.
-        /// </returns>
-        public VoteSetBits? HandleMaj23(ConsensusMaj23Msg maj23)
-        {
-            long height = maj23.Maj23.Height;
-            if (height < Height)
-            {
-                _logger.Debug(
-                    "Ignore a received VoteSetBits as its height " +
-                    "#{Height} is lower than the current context's height #{ContextHeight}",
-                    height,
-                    Height);
-            }
-            else
-            {
-                lock (_contextLock)
-                {
-                    if (_contexts.ContainsKey(height))
-                    {
-                        _contexts[height].ProduceMessage(maj23);
-                        return _contexts[height]
-                            .GetVoteSetBits(
-                                maj23.Maj23.Round,
-                                maj23.Maj23.BlockHash,
-                                maj23.Maj23.Flag);
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
         /// Handles a received <see cref="VoteSetBits"/> and return message to fetch.
         /// </summary>
         /// <param name="voteSetBits">The <see cref="VoteSetBits"/> received from any validator.

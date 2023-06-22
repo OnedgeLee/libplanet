@@ -256,9 +256,10 @@ namespace Libplanet.Net.Tests.Consensus
         }
 
         [Fact]
-        public void HandleMaj23()
+        public async void GetVoteSetBits()
         {
             PrivateKey proposer = TestUtils.PrivateKeys[1];
+            AsyncAutoResetEvent stepChanged = new AsyncAutoResetEvent();
             var (blockChain, consensusContext) = TestUtils.CreateDummyConsensusContext(
                 TimeSpan.FromSeconds(1),
                 TestUtils.Policy,
@@ -293,27 +294,31 @@ namespace Libplanet.Net.Tests.Consensus
                 DateTimeOffset.UtcNow,
                 TestUtils.PrivateKeys[3].PublicKey,
                 VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[3]);
+            consensusContext.StateChanged += (_, eventArgs) =>
+            {
+                if (eventArgs is { Height: 1, Step: ConsensusStep.PreCommit })
+                {
+                    stepChanged.Set();
+                }
+            };
+
             consensusContext.HandleMessage(new ConsensusProposalMsg(proposal));
             consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote1));
-            consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote2));
             consensusContext.HandleMessage(new ConsensusPreVoteMsg(preVote3));
+            await stepChanged.WaitAsync();
 
-            // VoteSetBits expects missing votes and corresponding proposal
-            var maj23 =
-                new Maj23Metadata(
-                        1,
-                        0,
-                        block.Hash,
-                        DateTimeOffset.UtcNow,
-                        TestUtils.PrivateKeys[1].PublicKey,
-                        VoteFlag.PreCommit)
-                    .Sign(TestUtils.PrivateKeys[1]);
-            VoteSetBits? voteSetBits = consensusContext.HandleMaj23(new ConsensusMaj23Msg(maj23));
-            Assert.NotNull(voteSetBits);
+            // VoteSetBits expects missing votes
+            VoteSetBits voteSetBits = consensusContext.Contexts[1]
+                .GetVoteSetBits(0, block.Hash, VoteFlag.PreVote);
+            Assert.True(
+                voteSetBits.VoteBits.SequenceEqual(new[] { true, true, false, true }));
+            voteSetBits = consensusContext.Contexts[1]
+                .GetVoteSetBits(0, block.Hash, VoteFlag.PreCommit);
+            Assert.True(
+                voteSetBits.VoteBits.SequenceEqual(new[] { true, false, false, false }));
         }
 
-#pragma warning disable S125
-        /*[Fact]
+        [Fact]
         public async void HandleVoteSetBits()
         {
             PrivateKey proposer = TestUtils.PrivateKeys[1];
@@ -380,12 +385,15 @@ namespace Libplanet.Net.Tests.Consensus
                         DateTimeOffset.UtcNow,
                         TestUtils.PrivateKeys[1].PublicKey,
                         VoteFlag.PreVote,
-                        new[] { false, true, true, true })
+                        new[] { false, false, true, false })
                     .Sign(TestUtils.PrivateKeys[1]);
-            ConsensusMsg[] votesAndProposal =
+            ConsensusMsg[] votes =
                 consensusContext.HandleVoteSetBits(voteSetBits).ToArray();
-            Assert.IsType<ConsensusProposalMsg>(votesAndProposal[0]);
-        }*/
-#pragma warning restore S125
+            Assert.True(votes.All(vote => vote is ConsensusPreVoteMsg));
+            Assert.Equal(3, votes.Length);
+            Assert.Equal(TestUtils.PrivateKeys[0].PublicKey, votes[0].ValidatorPublicKey);
+            Assert.Equal(TestUtils.PrivateKeys[1].PublicKey, votes[1].ValidatorPublicKey);
+            Assert.Equal(TestUtils.PrivateKeys[3].PublicKey, votes[2].ValidatorPublicKey);
+        }
     }
 }

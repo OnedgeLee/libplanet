@@ -6,6 +6,7 @@ using System.Numerics;
 using Libplanet.Blocks;
 using Libplanet.Consensus;
 using Libplanet.Crypto;
+using Serilog;
 
 namespace Libplanet.Net.Consensus
 {
@@ -19,7 +20,7 @@ namespace Libplanet.Net.Consensus
         private readonly object _lock;
         private readonly Dictionary<PublicKey, Vote> _votes; // Primary votes to share
         private readonly Dictionary<BlockHash, BlockVotes> _votesByBlock;
-        private readonly Dictionary<BoundPeer, BlockHash> _peerMaj23s;
+        private readonly Dictionary<PublicKey, BlockHash> _peerMaj23s;
         private BlockHash? _maj23; // First 2/3 majority seen
 
         public VoteSet(
@@ -40,7 +41,7 @@ namespace Libplanet.Net.Consensus
             _lock = new object();
             _votes = new Dictionary<PublicKey, Vote>();
             _votesByBlock = new Dictionary<BlockHash, BlockVotes>();
-            _peerMaj23s = new Dictionary<BoundPeer, BlockHash>();
+            _peerMaj23s = new Dictionary<PublicKey, BlockHash>();
         }
 
         public IEnumerable<Validator> Validators => _validatorSet.Validators;
@@ -50,7 +51,7 @@ namespace Libplanet.Net.Consensus
 
         public int Count => _votes.Count;
 
-        public int TotalCount => _votesByBlock.Count;
+        public int TotalCount => _votesByBlock.Values.Sum(votes => votes.Votes.Count);
 
         public void AddVote(Vote vote)
         {
@@ -138,10 +139,13 @@ namespace Libplanet.Net.Consensus
         // this can cause memory issues.
         // TODO: implement ability to remove peers too
         // NOTE: VoteSet must not be nil
-        public bool SetPeerMaj23(PublicKey publicKey, BlockHash blockHash)
+        public bool SetPeerMaj23(Maj23 maj23)
         {
             lock (_lock)
             {
+                PublicKey publicKey = maj23.ValidatorPublicKey;
+                BlockHash blockHash = maj23.BlockHash;
+
                 // Make sure peer hasn't already told us something.
                 if (_peerMaj23s.ContainsKey(publicKey))
                 {
@@ -150,16 +154,11 @@ namespace Libplanet.Net.Consensus
                     {
                         return false;
                     }
-                    else
-                    {
-                        _logger.Information(
-                            "Received conflicting BlockHash from peer {PublicKey} " +
-                            "(Expected: {Hash}, Actual: {BlockHash})",
-                            publicKey,
-                            hash,
-                            blockHash);
-                        return false;
-                    }
+
+                    throw new InvalidMaj23Exception(
+                        $"Received conflicting BlockHash from peer {publicKey} " +
+                        $"(Expected: {hash}, Actual: {blockHash})",
+                        maj23);
                 }
 
                 _peerMaj23s[publicKey] = blockHash;
@@ -295,11 +294,12 @@ namespace Libplanet.Net.Consensus
             }
         }
 
-        public BlockCommit ToBlockCommit()
+        public BlockCommit? ToBlockCommit()
         {
             if (!IsCommit())
             {
-                throw new Exception();
+                _logger.Information("Failed to create block commit since no +2/3 votes collected");
+                return null;
             }
 
             return new BlockCommit(

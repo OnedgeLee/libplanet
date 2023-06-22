@@ -343,7 +343,7 @@ namespace Libplanet.Net.Consensus
             {
                 _logger.Debug(
                     "PreCommit step in round {Round} is scheduled to be timed out because " +
-                    "1/3+ PreCommits are collected for the round. (context: {Context})",
+                    "2/3+ PreCommits are collected for the round. (context: {Context})",
                     Round,
                     ToString());
                 _preCommitTimeoutFlags.Add(Round);
