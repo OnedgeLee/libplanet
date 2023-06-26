@@ -87,13 +87,6 @@ namespace Libplanet.Net.Consensus
                         message);
                 }
 
-                if (message.Round != Round)
-                {
-                    throw new InvalidConsensusMessageException(
-                        $"Given message's round {message.Round} is invalid",
-                        message);
-                }
-
                 if (!_validatorSet.ContainsPublicKey(message.ValidatorPublicKey))
                 {
                     throw new InvalidConsensusMessageException(
