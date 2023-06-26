@@ -190,7 +190,7 @@ namespace Libplanet.Net.Consensus
                             VoteSetBits voteSetBits = _consensusContext.Contexts[maj23Msg.Height]
                                 .GetVoteSetBits(
                                     maj23Msg.Round,
-                                    maj23Msg.BlockHash,
+                                    maj23Msg.Maj23.BlockHash,
                                     maj23Msg.Maj23.Flag);
                             var sender = _gossip.Peers.First(
                                 peer => peer.PublicKey.Equals(maj23Msg.ValidatorPublicKey));
@@ -206,6 +206,36 @@ namespace Libplanet.Net.Consensus
                             "Cannot respond received ConsensusMaj23Msg message " +
                             "{Message} since there is no corresponding peer in the table",
                             maj23Msg);
+                    }
+
+                    break;
+
+                case ConsensusBootstrapMsg bootstrapMsg:
+                    // NOTE: bootstrapMsg won't be added via `AddMessage()`,
+                    // and won't trigger mutation.
+                    try
+                    {
+                        var sender = _gossip.Peers.First(
+                        peer => peer.PublicKey.Equals(bootstrapMsg.Bootstrap.ValidatorPublicKey));
+                        var reply = _consensusContext.HandleBootstrap(bootstrapMsg);
+                        if (reply is null || reply.Votes.Count < 1)
+                        {
+                            _logger.Debug(
+                                "Cannot respond received ConsensusBootstrapMsg message " +
+                                "{Message} since there is no corresponding votes");
+                            break;
+                        }
+
+                        _gossip.PublishMessage(
+                            new ConsensusVotesRecallMsg(reply),
+                            new[] { sender });
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        _logger.Debug(
+                            "Cannot respond received ConsensusBootstrapMsg message " +
+                            "{Message} since there is no corresponding peer in the table",
+                            bootstrapMsg);
                     }
 
                     break;

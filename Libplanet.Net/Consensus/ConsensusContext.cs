@@ -305,6 +305,50 @@ namespace Libplanet.Net.Consensus
         }
 
         /// <summary>
+        /// Handles a received <see cref="ConsensusBootstrapMsg"/>
+        /// and return <see cref="VotesRecall"/> to send as a reply.
+        /// </summary>
+        /// <param name="bootstrapMsg">The <see cref="ConsensusBootstrapMsg"/>
+        /// received from bootstrapping validator.
+        /// </param>
+        /// <returns>
+        /// A nullable <see cref="VotesRecall"/> to reply back.
+        /// </returns>
+        public VotesRecall? HandleBootstrap(ConsensusBootstrapMsg bootstrapMsg)
+        {
+            long height = bootstrapMsg.Bootstrap.Height;
+            int round = bootstrapMsg.Bootstrap.Round;
+            if (height < Height)
+            {
+                _logger.Debug(
+                    "Ignore a received Bootstrap as its height " +
+                    "#{Height} is lower than the current context's height #{ContextHeight}",
+                    height,
+                    Height);
+            }
+            else
+            {
+                lock (_contextLock)
+                {
+                    if (_contexts.ContainsKey(height))
+                    {
+                        try
+                        {
+                            return _contexts[height]
+                                .GetVotesRecall(round);
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Returns the summary for <see cref="ConsensusContext"/>.
         /// </summary>
         /// <returns>Returns the current height <see cref="Context"/>. if there's no instance of

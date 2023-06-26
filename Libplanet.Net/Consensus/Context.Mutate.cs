@@ -25,6 +25,14 @@ namespace Libplanet.Net.Consensus
                 ToString());
             Round = round;
             _heightVoteSet.SetRound(round);
+            if (_bootstrapping)
+            {
+                Bootstrap bootstrap = new BootstrapMetadata(
+                    Height, round, DateTimeOffset.UtcNow, _privateKey.PublicKey).Sign(_privateKey);
+                BroadcastMessage(
+                    new ConsensusBootstrapMsg(bootstrap));
+            }
+
             Proposal = null;
             Step = ConsensusStep.Propose;
             if (_validatorSet.GetProposer(Height, Round).PublicKey == _privateKey.PublicKey)
@@ -94,33 +102,55 @@ namespace Libplanet.Net.Consensus
                         message);
                 }
 
-                switch (message)
+                if (message is ConsensusVoteMsg voteMsg)
                 {
-                    case ConsensusProposalMsg proposal:
-                        AddProposal(proposal.Proposal);
-                        break;
-                    case ConsensusPreVoteMsg preVote:
-                        _heightVoteSet.AddVote(preVote.PreVote);
-                        break;
-                    case ConsensusPreCommitMsg preCommit:
-                        _heightVoteSet.AddVote(preCommit.PreCommit);
-                        break;
-                    case ConsensusMaj23Msg maj23:
-                        _heightVoteSet.SetPeerMaj23(maj23.Maj23);
-                        break;
-                }
+                    switch (voteMsg)
+                    {
+                        case ConsensusProposalMsg proposal:
+                            AddProposal(proposal.Proposal);
+                            break;
+                        case ConsensusPreVoteMsg preVote:
+                            _heightVoteSet.AddVote(preVote.PreVote);
+                            break;
+                        case ConsensusPreCommitMsg preCommit:
+                            _heightVoteSet.AddVote(preCommit.PreCommit);
+                            break;
+                    }
 
-                _logger.Debug(
-                    "{FName}: Message: {Message} => Height: {Height}, Round: {Round}, " +
-                    "Validator Address: {VAddress}, " +
-                    "Hash: {BlockHash}. (context: {Context})",
-                    nameof(AddMessage),
-                    message,
-                    message.Height,
-                    message.Round,
-                    message.ValidatorPublicKey.ToAddress(),
-                    message.BlockHash,
-                    ToString());
+                    _logger.Debug(
+                        "{FName}: Message: {Message} => Height: {Height}, Round: {Round}, " +
+                        "Validator Address: {VAddress}, " +
+                        "Hash: {BlockHash}. (context: {Context})",
+                        nameof(AddMessage),
+                        voteMsg,
+                        voteMsg.Height,
+                        voteMsg.Round,
+                        voteMsg.ValidatorPublicKey.ToAddress(),
+                        voteMsg.BlockHash,
+                        ToString());
+                }
+                else
+                {
+                    switch (message)
+                    {
+                        case ConsensusMaj23Msg maj23:
+                            _heightVoteSet.SetPeerMaj23(maj23.Maj23);
+                            break;
+                        case ConsensusVotesRecallMsg votesRecall:
+                            CatchupWithVotesRecall(votesRecall.VotesRecall);
+                            break;
+                    }
+
+                    _logger.Debug(
+                        "{FName}: Message: {Message} => Height: {Height}, Round: {Round}, " +
+                        "Validator Address: {VAddress}. (context: {Context})",
+                        nameof(AddMessage),
+                        message,
+                        message.Height,
+                        message.Round,
+                        message.ValidatorPublicKey.ToAddress(),
+                        ToString());
+                }
 
                 return true;
             }
@@ -317,7 +347,7 @@ namespace Libplanet.Net.Consensus
                     BroadcastMessage(
                         new ConsensusPreCommitMsg(MakeVote(Round, default, VoteFlag.PreCommit)));
                 }
-                else if (!(Proposal is null) && !hash3.Equals(Proposal.BlockHash))
+                else if (Proposal is { } proposal && !proposal.Equals(hash3))
                 {
                     // +2/3 votes were collected and is not equal to proposal's,
                     // remove invalid proposal.

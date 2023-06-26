@@ -23,16 +23,12 @@ namespace Libplanet.Net.Consensus
                 Height,
                 lastCommit);
             _lastCommit = lastCommit;
+            _bootstrapping = bootstrapping;
             ProduceMutation(() => StartRound(0));
 
             // FIXME: Exceptions inside tasks should be handled properly.
             _ = MessageConsumerTask(_cancellationTokenSource.Token);
             _ = MutationConsumerTask(_cancellationTokenSource.Token);
-
-            if (bootstrapping)
-            {
-                _ = BootstrappingTask(_cancellationTokenSource.Token);
-            }
         }
 
         /// <summary>
@@ -96,30 +92,6 @@ namespace Libplanet.Net.Consensus
                     ExceptionOccurred?.Invoke(this, e);
                     throw;
                 }
-            }
-        }
-
-        internal async Task BootstrappingTask(CancellationToken cancellationToken)
-        {
-            while (true)
-            {
-                try
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-                }
-                catch (OperationCanceledException oce)
-                {
-                    _logger.Debug(oce, "Cancellation was requested");
-                    ExceptionOccurred?.Invoke(this, oce);
-                    throw;
-                }
-#pragma warning disable S125
-                /*if (_heightVoteSet.GetRandomMessage() is { } message)
-                {
-                    BroadcastMessage(message)
-                }*/
-#pragma warning restore S125
             }
         }
 

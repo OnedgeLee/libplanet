@@ -74,7 +74,6 @@ namespace Libplanet.Net.Consensus
         {
             lock (_lock)
             {
-                // FIXME: This shouldn't be _round + 1?
                 var newRound = _round + 1;
                 if (_round != 0 && (round < newRound))
                 {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Libplanet.Blocks;
 using Libplanet.Consensus;
 
 namespace Libplanet.Net.Messages
@@ -18,10 +19,10 @@ namespace Libplanet.Net.Messages
             : base(
                 voteSetBits.ValidatorPublicKey,
                 voteSetBits.Height,
-                voteSetBits.Round,
-                voteSetBits.BlockHash)
+                voteSetBits.Round)
         {
             VoteSetBits = voteSetBits;
+            BlockHash = voteSetBits.BlockHash;
         }
 
         /// <summary>
@@ -38,6 +39,11 @@ namespace Libplanet.Net.Messages
         /// A <see cref="VoteSetBits"/> of the message.
         /// </summary>
         public VoteSetBits VoteSetBits { get; }
+
+        /// <summary>
+        /// A <see cref="BlockHash"/> of the message.
+        /// </summary>
+        public BlockHash BlockHash { get; }
 
         /// <inheritdoc cref="MessageContent.DataFrames"/>
         public override IEnumerable<byte[]> DataFrames =>

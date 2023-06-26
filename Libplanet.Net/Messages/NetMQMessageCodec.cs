@@ -217,6 +217,10 @@ namespace Libplanet.Net.Messages
                     return new HaveMessage(dataframes);
                 case MessageContent.MessageType.WantMessage:
                     return new WantMessage(dataframes);
+                case MessageContent.MessageType.BootstrapMsg:
+                    return new ConsensusBootstrapMsg(dataframes);
+                case MessageContent.MessageType.VotesRecallMsg:
+                    return new ConsensusVotesRecallMsg(dataframes);
                 default:
                     throw new InvalidCastException($"Given type {type} is not a valid message.");
             }

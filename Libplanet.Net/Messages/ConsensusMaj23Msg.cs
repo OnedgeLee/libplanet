@@ -14,7 +14,7 @@ namespace Libplanet.Net.Messages
         /// </summary>
         /// <param name="maj23">A <see cref="Maj23"/> of given height and round.</param>
         public ConsensusMaj23Msg(Maj23 maj23)
-            : base(maj23.ValidatorPublicKey, maj23.Height, maj23.Round, maj23.BlockHash)
+            : base(maj23.ValidatorPublicKey, maj23.Height, maj23.Round)
         {
             Maj23 = maj23;
         }
@@ -41,17 +41,20 @@ namespace Libplanet.Net.Messages
         /// <inheritdoc cref="MessageContent.MessageType"/>
         public override MessageType Type => MessageType.ConsensusMaj23Msg;
 
+        /// <inheritdoc cref="ConsensusMsg.Equals(ConsensusMsg?)"/>
         public override bool Equals(ConsensusMsg? other)
         {
             return other is ConsensusMaj23Msg message &&
                    message.Maj23.Equals(Maj23);
         }
 
+        /// <inheritdoc cref="ConsensusMsg.Equals(object?)"/>
         public override bool Equals(object? obj)
         {
             return obj is ConsensusMaj23Msg other && Equals(other);
         }
 
+        /// <inheritdoc cref="ConsensusMsg.GetHashCode"/>
         public override int GetHashCode()
         {
             return HashCode.Combine(Type, Maj23);

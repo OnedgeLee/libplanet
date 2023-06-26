@@ -122,6 +122,16 @@ namespace Libplanet.Net.Messages
             ConsensusVoteSetBitsMsg = 0x46,
 
             /// <summary>
+            /// Message that informs peer is on bootstrapping to other peer.
+            /// </summary>
+            BootstrapMsg = 0x47,
+
+            /// <summary>
+            /// Message that helps peer by recalling past votes.
+            /// </summary>
+            VotesRecallMsg = 0x48,
+
+            /// <summary>
             /// List of message IDs that the peer seen recently.
             /// </summary>
             HaveMessage = 0x43,
