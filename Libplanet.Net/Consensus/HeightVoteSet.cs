@@ -114,12 +114,39 @@ namespace Libplanet.Net.Consensus
         {
             lock (_lock)
             {
-                PublicKey publicKey = vote.ValidatorPublicKey;
+                if (vote.Height != _height)
+                {
+                    throw new InvalidVoteException(
+                        "Height of vote is different from current HeightVoteSet",
+                        vote);
+                }
+
+                PublicKey validatorKey = vote.ValidatorPublicKey;
+
+                if (validatorKey is null)
+                {
+                    throw new InvalidVoteException("ValidatorKey of the vote cannot be null", vote);
+                }
+
+                if (!_validatorSet.ContainsPublicKey(validatorKey))
+                {
+                    throw new InvalidVoteException(
+                        "ValidatorKey of the vote is not in the validator set",
+                        vote);
+                }
+
                 if (!vote.Flag.Equals(VoteFlag.PreVote) &&
                     !vote.Flag.Equals(VoteFlag.PreCommit))
                 {
                     throw new InvalidVoteException(
                         $"VoteFlag should be either {VoteFlag.PreVote} or {VoteFlag.PreCommit}",
+                        vote);
+                }
+
+                if (!vote.Verify())
+                {
+                    throw new InvalidVoteException(
+                        "Received vote's signature is invalid",
                         vote);
                 }
 
@@ -131,18 +158,18 @@ namespace Libplanet.Net.Consensus
                 }
                 catch (KeyNotFoundException)
                 {
-                    if (!_peerCatchupRounds.ContainsKey(publicKey))
+                    if (!_peerCatchupRounds.ContainsKey(validatorKey))
                     {
-                        _peerCatchupRounds[publicKey] = new List<int>();
+                        _peerCatchupRounds[validatorKey] = new List<int>();
                     }
 
-                    List<int> rounds = _peerCatchupRounds[publicKey];
+                    List<int> rounds = _peerCatchupRounds[validatorKey];
                     if (rounds.Count < 2)
                     {
                         AddRound(vote.Round);
                         voteSet = GetVoteSet(vote.Round, vote.Flag);
                         rounds.Add(vote.Round);
-                        _peerCatchupRounds[publicKey] = rounds;
+                        _peerCatchupRounds[validatorKey] = rounds;
                     }
                     else
                     {
@@ -152,7 +179,7 @@ namespace Libplanet.Net.Consensus
                     }
                 }
 
-                voteSet.AddVote(vote);
+                voteSet.AddVerifiedVote(vote);
             }
         }
 

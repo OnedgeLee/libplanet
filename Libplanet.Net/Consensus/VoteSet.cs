@@ -53,52 +53,6 @@ namespace Libplanet.Net.Consensus
 
         public int TotalCount => _votesByBlock.Values.Sum(votes => votes.Votes.Count);
 
-        public void AddVote(Vote vote)
-        {
-            PublicKey validatorKey = vote.ValidatorPublicKey;
-
-            if (validatorKey is null)
-            {
-                throw new InvalidVoteException("ValidatorKey of the vote cannot be null", vote);
-            }
-
-            if (!_validatorSet.ContainsPublicKey(validatorKey))
-            {
-                throw new InvalidVoteException(
-                    "ValidatorKey of the vote is not in the validator set",
-                    vote);
-            }
-
-            int validatorIndex = _validatorSet.FindIndex(validatorKey);
-            BlockHash blockHash = vote.BlockHash;
-
-            if (vote.Height != _height ||
-                vote.Round != _round ||
-                vote.Flag != _voteType)
-            {
-                throw new InvalidVoteException(
-                    "Height, round, flag of the vote mismatches",
-                    vote);
-            }
-
-            if (GetVote(validatorKey, blockHash) is { })
-            {
-                // TODO: Exception segmentation required for the case where vote exists and
-                // signature mismatches.
-                throw new InvalidVoteException("Received vote already exists", vote);
-            }
-
-            if (!vote.Verify())
-            {
-                throw new InvalidVoteException(
-                    "Received vote's signature is invalid",
-                    vote);
-            }
-
-            // Add vote and get conflicting vote if any.
-            AddVerifiedVote(vote, blockHash, _validatorSet.GetValidator(validatorKey).Power);
-        }
-
         public bool Contains(PublicKey publicKey, BlockHash blockHash)
         {
             return _votes.Values.Any(
@@ -306,19 +260,26 @@ namespace Libplanet.Net.Consensus
                 _height, _round, _maj23!.Value, MappedList().ToImmutableArray());
         }
 
-        internal void AddVerifiedVote(
-            Vote vote,
-            BlockHash blockHash,
-            BigInteger votingPower)
+        internal void AddVerifiedVote(Vote vote)
         {
-            var publicKey = vote.ValidatorPublicKey;
+            if (vote.Round != _round ||
+                vote.Flag != _voteType)
+            {
+                throw new InvalidVoteException(
+                    "Round, flag of the vote mismatches",
+                    vote);
+            }
+
+            PublicKey validatorKey = vote.ValidatorPublicKey;
+            BlockHash blockHash = vote.BlockHash;
+
             Vote? conflicting = null;
             _logger.Debug("Adding verified vote {Vote}", vote);
 
             // Already exists in voteSet.votes?
-            if (_votes.ContainsKey(publicKey))
+            if (_votes.ContainsKey(validatorKey))
             {
-                var existing = _votes[publicKey];
+                var existing = _votes[validatorKey];
                 if (existing.BlockHash.Equals(vote.BlockHash))
                 {
                     throw new InvalidVoteException(
@@ -333,7 +294,7 @@ namespace Libplanet.Net.Consensus
                 // Replace vote if blockKey matches voteSet.maj23.
                 if (_maj23 is { } maj23NotNull && maj23NotNull.Equals(blockHash))
                 {
-                    _votes[publicKey] = vote;
+                    _votes[validatorKey] = vote;
                 }
 
                 // Otherwise don't add it to voteSet.votes
@@ -341,7 +302,7 @@ namespace Libplanet.Net.Consensus
             else
             {
                 // Add to voteSet.votes and incr .sum
-                _votes[publicKey] = vote;
+                _votes[validatorKey] = vote;
             }
 
             if (_votesByBlock.ContainsKey(blockHash))
@@ -380,7 +341,7 @@ namespace Libplanet.Net.Consensus
             BigInteger quorum = _validatorSet.TwoThirdsPower + 1;
 
             // Add vote to votesByBlock
-            votesByBlock.AddVerifiedVote(vote, votingPower);
+            votesByBlock.AddVerifiedVote(vote, _validatorSet.GetValidator(validatorKey).Power);
 
             // If we just crossed the quorum threshold and have 2/3 majority...
             if (origSum < quorum && quorum <= votesByBlock.Sum && _maj23 is null)
