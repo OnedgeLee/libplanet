@@ -204,6 +204,11 @@ namespace Libplanet.Net
                     await foreach (var hashes in EnumerateChunks(cancellationToken))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        if (!hashes.Any())
+                        {
+                            continue;
+                        }
+
                         IList<BlockHash> blockHashes =
                             hashes is IList<BlockHash> l ? l : hashes.ToList();
 
@@ -237,6 +242,11 @@ namespace Libplanet.Net
                 catch (InvalidOperationException)
                 {
                     break;
+                }
+
+                if (triple is null || triple.Item1 is null)
+                {
+                    continue;
                 }
 
                 yield return triple;
@@ -285,7 +295,7 @@ namespace Libplanet.Net
         }
 
         private bool QueuedDemandCompleted() =>
-                        _started && _demands.IsEmpty && _satisfiedBlocks.All(kv => kv.Value);
+            _started && _demands.IsEmpty && _satisfiedBlocks.All(kv => kv.Value);
 
         private Func<TPeer, CancellationToken, Task> CreateEnqueuing(
             IList<BlockHash> blockHashes,
