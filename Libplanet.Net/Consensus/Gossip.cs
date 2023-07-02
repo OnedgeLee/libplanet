@@ -26,7 +26,7 @@ namespace Libplanet.Net.Consensus
         private readonly ITransport _transport;
         private readonly Dictionary<MessageId, MessageContent> _cache;
         private readonly Action<Message> _validateMessage;
-        private readonly Action<MessageContent> _processMessage;
+        private readonly Action<Message> _processMessage;
         private readonly IEnumerable<BoundPeer> _seeds;
         private readonly ILogger _logger;
 
@@ -51,7 +51,7 @@ namespace Libplanet.Net.Consensus
             ImmutableArray<BoundPeer> peers,
             ImmutableArray<BoundPeer> seeds,
             Action<Message> validateMessage,
-            Action<MessageContent> processMessage)
+            Action<Message> processMessage)
         {
             _transport = transport;
             _cache = new Dictionary<MessageId, MessageContent>();
@@ -189,30 +189,30 @@ namespace Libplanet.Net.Consensus
         /// <param name="content">A <see cref="MessageContent"/> instance to publish.</param>
         public void PublishMessage(MessageContent content)
         {
-            AddMessage(content);
+            AddMessage(_transport.MakeMessage(content));
             _transport.BroadcastMessage(
                 PeersToBroadcast(_table.Peers, DLazy),
                 content);
         }
 
         /// <summary>
-        /// Process a <see cref="MessageContent"/> and add it to the gossip.
+        /// Process a <see cref="Message"/> and add it to the gossip.
         /// </summary>
-        /// <param name="content">A <see cref="MessageContent"/> instance to
+        /// <param name="message">A <see cref="Message"/> instance to
         /// process and gossip.</param>
-        public void AddMessage(MessageContent content)
+        public void AddMessage(Message message)
         {
-            if (_cache.TryGetValue(content.Id, out _))
+            if (_cache.TryGetValue(message.Content.Id, out _))
             {
                 _logger.Verbose(
                     "Message of content {Content} with id {Id} seen recently, ignored",
-                    content,
-                    content.Id);
+                    message.Content,
+                    message.Content.Id);
             }
 
             try
             {
-                _cache.Add(content.Id, content);
+                _cache.Add(message.Content.Id, message.Content);
             }
             catch (Exception)
             {
@@ -221,7 +221,7 @@ namespace Libplanet.Net.Consensus
 
             try
             {
-                _processMessage(content);
+                _processMessage(message);
             }
             catch (Exception)
             {
@@ -230,14 +230,14 @@ namespace Libplanet.Net.Consensus
         }
 
         /// <summary>
-        /// Adds multiple <see cref="MessageContent"/>s in parallel.
-        /// <seealso cref="AddMessage(MessageContent)"/>
+        /// Adds multiple <see cref="Message"/>s in parallel.
+        /// <seealso cref="AddMessage(Message)"/>
         /// </summary>
-        /// <param name="contents">
-        /// An enumerable <see cref="MessageContent"/> instance to process and gossip.</param>
-        public void AddMessages(IEnumerable<MessageContent> contents)
+        /// <param name="messages">
+        /// An enumerable <see cref="Message"/> instance to process and gossip.</param>
+        public void AddMessages(IEnumerable<Message> messages)
         {
-            contents.AsParallel().ForAll(AddMessage);
+            messages.AsParallel().ForAll(AddMessage);
         }
 
         /// <summary>
@@ -329,7 +329,7 @@ namespace Libplanet.Net.Consensus
                     break;
                 default:
                     await ReplyMessagePongAsync(msg, ctx);
-                    AddMessage(msg.Content);
+                    AddMessage(msg);
                     break;
             }
         };
@@ -444,7 +444,7 @@ namespace Libplanet.Net.Consensus
                         replies.Length,
                         replies,
                         replies.Select(m => m.Content.Id).ToArray());
-                    AddMessages(replies.Select(m => m.Content));
+                    AddMessages(replies);
                 },
                 ctx);
         }

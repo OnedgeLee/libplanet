@@ -24,15 +24,15 @@ namespace Libplanet.Net.Consensus
         /// </param>
         /// <param name="seedPeers">A list of seed's <see cref="BoundPeer"/>.</param>
         /// <param name="processMessage">Action to be called when receiving a new
-        /// <see cref="ConsensusMsg"/>.</param>
+        /// <see cref="Message"/>.</param>
         public GossipConsensusMessageCommunicator(
             ITransport consensusTransport,
             ImmutableArray<BoundPeer> validatorPeers,
             ImmutableArray<BoundPeer> seedPeers,
-            Action<MessageContent> processMessage)
+            Action<Message> processMessage)
         {
             Gossip = new Gossip(
-                consensusTransport, validatorPeers, seedPeers, ValidateMessage, processMessage);
+                consensusTransport, validatorPeers, seedPeers, _ => { }, processMessage);
         }
 
         /// <summary>
@@ -69,17 +69,5 @@ namespace Libplanet.Net.Consensus
 
         /// <inheritdoc/>
         public void ClearDenySet() => Gossip.ClearDenySet();
-
-        private void ValidateMessage(Message message)
-        {
-            if (message.Content is ConsensusMsg consensusMsg
-                && message.Remote.PublicKey.Equals(consensusMsg.ValidatorPublicKey))
-            {
-                throw new InvalidConsensusMessageException(
-                    $"Public key of ConsensusMessage is different from" +
-                    $"Peer's public key that has been sent : {message.Remote.PublicKey}",
-                    consensusMsg);
-            }
-        }
     }
 }

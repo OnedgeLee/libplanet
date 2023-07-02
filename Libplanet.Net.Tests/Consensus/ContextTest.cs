@@ -177,25 +177,27 @@ namespace Libplanet.Net.Tests.Consensus
             // Make PreVotes to normally move to PreCommit step.
             foreach (int i in new int[] { 0, 1, 3 })
             {
-                context.ProduceMessage(new ConsensusPreVoteMsg(new VoteMetadata(
-                    2,
-                    0,
-                    proposedBlock!.Hash,
-                    DateTimeOffset.UtcNow,
-                    TestUtils.PrivateKeys[i].PublicKey,
-                    VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[i])));
+                context.ProduceMessage(TestUtils.MakeMessage(new ConsensusPreVoteMsg(
+                    new VoteMetadata(
+                        2,
+                        0,
+                        proposedBlock!.Hash,
+                        DateTimeOffset.UtcNow,
+                        TestUtils.PrivateKeys[i].PublicKey,
+                        VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[i]))));
             }
 
             // Validator 2 will automatically vote its PreCommit.
             foreach (int i in new int[] { 0, 1 })
             {
-                context.ProduceMessage(new ConsensusPreCommitMsg(new VoteMetadata(
-                    2,
-                    0,
-                    proposedBlock!.Hash,
-                    DateTimeOffset.UtcNow,
-                    TestUtils.PrivateKeys[i].PublicKey,
-                    VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[i])));
+                context.ProduceMessage(TestUtils.MakeMessage(new ConsensusPreCommitMsg(
+                    new VoteMetadata(
+                        2,
+                        0,
+                        proposedBlock!.Hash,
+                        DateTimeOffset.UtcNow,
+                        TestUtils.PrivateKeys[i].PublicKey,
+                        VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[i]))));
             }
 
             await Task.WhenAll(stepChangedToEndCommit.WaitAsync(), exceptionOccurred.WaitAsync());
@@ -206,13 +208,13 @@ namespace Libplanet.Net.Tests.Consensus
             Assert.Equal(3, commit?.Votes.Where(vote => vote.Flag == VoteFlag.PreCommit).Count());
 
             // Context should still accept new votes.
-            context.ProduceMessage(new ConsensusPreCommitMsg(new VoteMetadata(
+            context.ProduceMessage(TestUtils.MakeMessage(new ConsensusPreCommitMsg(new VoteMetadata(
                 2,
                 0,
                 proposedBlock!.Hash,
                 DateTimeOffset.UtcNow,
                 TestUtils.PrivateKeys[3].PublicKey,
-                VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[3])));
+                VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[3]))));
 
             await Task.Delay(100);  // Wait for the new message to be added to the message log.
             commit = context.GetBlockCommit();
@@ -234,8 +236,8 @@ namespace Libplanet.Net.Tests.Consensus
             var block = blockChain.ProposeBlock(TestUtils.PrivateKeys[1]);
 
             context.Start();
-            context.ProduceMessage(
-                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[0]));
+            context.ProduceMessage(TestUtils.MakeMessage(
+                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[0])));
             await exceptionOccurred.WaitAsync();
             Assert.IsType<InvalidConsensusMessageException>(exceptionThrown);
         }
@@ -255,21 +257,21 @@ namespace Libplanet.Net.Tests.Consensus
             var block = blockChain.ProposeBlock(TestUtils.PrivateKeys[2]);
 
             context.Start();
-            context.ProduceMessage(
-                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[2], 2, 2));
+            context.ProduceMessage(TestUtils.MakeMessage(
+                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[2], 2, 2)));
             await exceptionOccurred.WaitAsync();
             Assert.IsType<InvalidConsensusMessageException>(exceptionThrown);
 
             // Reset exception thrown.
             exceptionThrown = null;
-            context.ProduceMessage(
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(
                     TestUtils.CreateVote(
                         TestUtils.PrivateKeys[2],
                         2,
                         0,
                         block.Hash,
-                        VoteFlag.PreVote)));
+                        VoteFlag.PreVote))));
             await exceptionOccurred.WaitAsync();
             Assert.IsType<InvalidConsensusMessageException>(exceptionThrown);
         }
@@ -299,7 +301,7 @@ namespace Libplanet.Net.Tests.Consensus
             void BroadcastMessage(ConsensusMsg message) =>
                 Task.Run(() =>
                 {
-                    context!.ProduceMessage(message);
+                    context!.ProduceMessage(TestUtils.MakeMessage(message));
                 });
 
             var consensusContext = new ConsensusContext(
@@ -365,12 +367,12 @@ namespace Libplanet.Net.Tests.Consensus
             var block = blockChain.ProposeBlock(TestUtils.PrivateKeys[1]);
 
             context.Start();
-            context.ProduceMessage(
-                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[1]));
+            context.ProduceMessage(TestUtils.MakeMessage(
+                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[1])));
 
             foreach (int i in new int[] { 1, 2, 3 })
             {
-                context.ProduceMessage(
+                context.ProduceMessage(TestUtils.MakeMessage(
                     new ConsensusPreVoteMsg(
                         new VoteMetadata(
                             1,
@@ -378,12 +380,12 @@ namespace Libplanet.Net.Tests.Consensus
                             block.Hash,
                             DateTimeOffset.UtcNow,
                             TestUtils.PrivateKeys[i].PublicKey,
-                            VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[i])));
+                            VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[i]))));
             }
 
             foreach (int i in new int[] { 1, 2, 3 })
             {
-                context.ProduceMessage(
+                context.ProduceMessage(TestUtils.MakeMessage(
                     new ConsensusPreCommitMsg(
                         new VoteMetadata(
                             1,
@@ -391,7 +393,7 @@ namespace Libplanet.Net.Tests.Consensus
                             block.Hash,
                             DateTimeOffset.UtcNow,
                             TestUtils.PrivateKeys[i].PublicKey,
-                            VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[i])));
+                            VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[i]))));
             }
 
             await Task.WhenAll(blockHeightOneAppended.WaitAsync(), enteredHeightTwo.WaitAsync());

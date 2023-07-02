@@ -58,7 +58,8 @@ namespace Libplanet.Net.Tests.Consensus
             consensusContext.NewHeight(1);
             var block1 = blockChain.ProposeBlock(TestUtils.PrivateKeys[1]);
             consensusContext.HandleMessage(
-                TestUtils.CreateConsensusPropose(block1, TestUtils.PrivateKeys[1]));
+                TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(
+                    block1, TestUtils.PrivateKeys[1])));
             var expectedVotes = new Vote[4];
 
             // Peer2 sends a ConsensusVote via background process.
@@ -72,7 +73,8 @@ namespace Libplanet.Net.Tests.Consensus
                     DateTimeOffset.UtcNow,
                     TestUtils.ValidatorSet[i].PublicKey,
                     VoteFlag.PreVote).Sign(TestUtils.PrivateKeys[i]);
-                consensusContext.HandleMessage(new ConsensusPreVoteMsg(expectedVotes[i]));
+                consensusContext.HandleMessage(TestUtils.MakeMessage(
+                    new ConsensusPreVoteMsg(expectedVotes[i])));
             }
 
             // Peer2 sends a ConsensusCommit via background process.
@@ -86,7 +88,8 @@ namespace Libplanet.Net.Tests.Consensus
                     DateTimeOffset.UtcNow,
                     TestUtils.ValidatorSet[i].PublicKey,
                     VoteFlag.PreCommit).Sign(TestUtils.PrivateKeys[i]);
-                consensusContext.HandleMessage(new ConsensusPreCommitMsg(expectedVotes[i]));
+                consensusContext.HandleMessage(TestUtils.MakeMessage(
+                    new ConsensusPreCommitMsg(expectedVotes[i])));
             }
 
             await heightTwoProposalSent.WaitAsync();
@@ -183,7 +186,7 @@ namespace Libplanet.Net.Tests.Consensus
                     continue;
                 }
 
-                consensusContext.HandleMessage(
+                consensusContext.HandleMessage(TestUtils.MakeMessage(
                     new ConsensusPreVoteMsg(
                         new VoteMetadata(
                             2,
@@ -191,7 +194,7 @@ namespace Libplanet.Net.Tests.Consensus
                             proposal!.BlockHash,
                             DateTimeOffset.UtcNow,
                             privateKey.PublicKey,
-                            VoteFlag.PreVote).Sign(privateKey)));
+                            VoteFlag.PreVote).Sign(privateKey))));
             }
 
             foreach ((PrivateKey privateKey, BoundPeer peer)
@@ -206,14 +209,13 @@ namespace Libplanet.Net.Tests.Consensus
                 }
 
                 consensusContext.HandleMessage(
-                    new ConsensusPreCommitMsg(
-                        new VoteMetadata(
-                            2,
-                            0,
-                            proposal!.BlockHash,
-                            DateTimeOffset.UtcNow,
-                            privateKey.PublicKey,
-                            VoteFlag.PreCommit).Sign(privateKey)));
+                    TestUtils.MakeMessage(new ConsensusPreCommitMsg(new VoteMetadata(
+                        2,
+                        0,
+                        proposal!.BlockHash,
+                        DateTimeOffset.UtcNow,
+                        privateKey.PublicKey,
+                        VoteFlag.PreCommit).Sign(privateKey))));
             }
 
             await heightTwoStepChangedToEndCommit.WaitAsync();
@@ -227,7 +229,8 @@ namespace Libplanet.Net.Tests.Consensus
 
             // Message from higher height
             consensusContext.HandleMessage(
-                TestUtils.CreateConsensusPropose(blockHeightThree, TestUtils.PrivateKeys[3], 3));
+                TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(
+                    blockHeightThree, TestUtils.PrivateKeys[3], 3)));
 
             // New height started.
             await heightThreeStepChangedToPropose.WaitAsync();
@@ -307,7 +310,8 @@ namespace Libplanet.Net.Tests.Consensus
 
             var block = blockChain.ProposeBlock(TestUtils.PrivateKeys[1]);
             consensusContext.HandleMessage(
-                TestUtils.CreateConsensusPropose(block, TestUtils.PrivateKeys[1]));
+                TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(
+                    block, TestUtils.PrivateKeys[1])));
 
             TestUtils.HandleFourPeersPreCommitMessages(
                  consensusContext, TestUtils.PrivateKeys[2], block.Hash);

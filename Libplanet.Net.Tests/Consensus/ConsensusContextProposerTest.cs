@@ -52,38 +52,22 @@ namespace Libplanet.Net.Tests.Consensus
 
             // Triggers timeout +2/3 with NIL and Block
             consensusContext.HandleMessage(
-                new ConsensusPreVoteMsg(
-                    TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[2],
-                        1,
-                        hash: default,
-                        flag: VoteFlag.PreVote)));
+                TestUtils.MakeMessage(new ConsensusPreVoteMsg(TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[2], 1, hash: default, flag: VoteFlag.PreVote))));
 
             consensusContext.HandleMessage(
-                new ConsensusPreVoteMsg(
-                    vote: TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[3],
-                        1,
-                        hash: default,
-                        flag: VoteFlag.PreVote)));
+                TestUtils.MakeMessage(new ConsensusPreVoteMsg(vote: TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[3], 1, hash: default, flag: VoteFlag.PreVote))));
 
             await timeoutProcessed.WaitAsync();
 
             consensusContext.HandleMessage(
-                new ConsensusPreCommitMsg(
-                    TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[2],
-                        1,
-                        hash: default,
-                        flag: VoteFlag.PreCommit)));
+                TestUtils.MakeMessage(new ConsensusPreCommitMsg(TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[2], 1, hash: default, flag: VoteFlag.PreCommit))));
 
             consensusContext.HandleMessage(
-                new ConsensusPreCommitMsg(
-                    vote: TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[3],
-                        1,
-                        hash: default,
-                        flag: VoteFlag.PreCommit)));
+                TestUtils.MakeMessage(new ConsensusPreCommitMsg(vote: TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[3], 1, hash: default, flag: VoteFlag.PreCommit))));
 
             await timeoutProcessed.WaitAsync();
             Assert.Equal(1, consensusContext.Height);

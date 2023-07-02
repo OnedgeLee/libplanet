@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Libplanet.Blocks;
 using Libplanet.Consensus;
+using Libplanet.Crypto;
 using Libplanet.Net.Messages;
 
 namespace Libplanet.Net.Consensus
@@ -70,6 +71,8 @@ namespace Libplanet.Net.Consensus
         /// </summary>
         /// <param name="message">A <see cref="ConsensusMsg"/> to be added.
         /// </param>
+        /// <param name="publicKey">A <see cref="PublicKey"/> of peer who published Message.
+        /// </param>
         /// <remarks>
         /// If an invalid <see cref="ConsensusMsg"/> is given, this method throws
         /// an <see cref="InvalidConsensusMessageException"/> and handles it <em>internally</em>
@@ -79,7 +82,7 @@ namespace Libplanet.Net.Consensus
         /// <see cref="HeightVoteSet.AddVote"/> returns <see langword="false"/>.
         /// </remarks>
         /// <seealso cref="HeightVoteSet.AddVote"/>
-        private bool AddMessage(ConsensusMsg message)
+        private bool AddMessage(ConsensusMsg message, PublicKey publicKey)
         {
             try
             {
@@ -107,11 +110,11 @@ namespace Libplanet.Net.Consensus
                     switch (voteMsg)
                     {
                         case ConsensusPreVoteMsg preVote:
-                            FilterSpam(preVote);
+                            FilterSpam(preVote, publicKey);
                             _heightVoteSet.AddVote(preVote.PreVote);
                             break;
                         case ConsensusPreCommitMsg preCommit:
-                            FilterSpam(preCommit);
+                            FilterSpam(preCommit, publicKey);
                             _heightVoteSet.AddVote(preCommit.PreCommit);
                             break;
                     }
@@ -163,7 +166,7 @@ namespace Libplanet.Net.Consensus
             }
         }
 
-        private void FilterSpam(ConsensusVoteMsg msg)
+        private void FilterSpam(ConsensusVoteMsg msg, PublicKey publicKey)
         {
             try
             {
@@ -171,24 +174,24 @@ namespace Libplanet.Net.Consensus
             }
             catch (KeyNotFoundException)
             {
-                if (!_peerCatchupRounds.ContainsKey(msg.ValidatorPublicKey))
+                if (!_peerCatchupRounds.ContainsKey(publicKey))
                 {
-                    _peerCatchupRounds[msg.ValidatorPublicKey] = new List<int>();
+                    _peerCatchupRounds[publicKey] = new List<int>();
                 }
 
-                List<int> rounds = _peerCatchupRounds[msg.ValidatorPublicKey];
+                List<int> rounds = _peerCatchupRounds[publicKey];
                 if (rounds.Count < 2)
                 {
                     _heightVoteSet.AddRound(msg.Round);
                     rounds.Add(msg.Round);
-                    _peerCatchupRounds[msg.ValidatorPublicKey] = rounds;
+                    _peerCatchupRounds[publicKey] = rounds;
                 }
                 else
                 {
-                    _consensusMessageCommunicator.DenyPublicKey(msg.ValidatorPublicKey);
+                    _consensusMessageCommunicator.DenyPublicKey(publicKey);
                     _logger.Information(
                         "Repetitively found heigher rounds, add {PublicKey} to deny set.",
-                        msg.ValidatorPublicKey);
+                        publicKey);
                 }
             }
         }

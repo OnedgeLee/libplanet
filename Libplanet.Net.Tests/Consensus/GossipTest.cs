@@ -51,9 +51,9 @@ namespace Libplanet.Net.Tests.Consensus
             var key2 = new PrivateKey();
             var receivedEvent = new AsyncAutoResetEvent();
             var gossip1 = CreateGossip(
-                content =>
+                message =>
                 {
-                    if (content is ConsensusProposalMsg)
+                    if (message.Content is ConsensusProposalMsg)
                     {
                         received1 = true;
                     }
@@ -62,9 +62,9 @@ namespace Libplanet.Net.Tests.Consensus
                 6001,
                 new[] { new BoundPeer(key2.PublicKey, new DnsEndPoint("127.0.0.1", 6002)) });
             var gossip2 = CreateGossip(
-                content =>
+                message =>
                 {
-                    if (content is ConsensusProposalMsg)
+                    if (message.Content is ConsensusProposalMsg)
                     {
                         received2 = true;
                         receivedEvent.Set();
@@ -106,9 +106,9 @@ namespace Libplanet.Net.Tests.Consensus
             var key2 = new PrivateKey();
             var receivedEvent = new AsyncAutoResetEvent();
             var gossip1 = CreateGossip(
-                content =>
+                message =>
                 {
-                    if (content is ConsensusProposalMsg)
+                    if (message.Content is ConsensusProposalMsg)
                     {
                         received1 = true;
                     }
@@ -117,9 +117,9 @@ namespace Libplanet.Net.Tests.Consensus
                 6001,
                 new[] { new BoundPeer(key2.PublicKey, new DnsEndPoint("127.0.0.1", 6002)) });
             var gossip2 = CreateGossip(
-                content =>
+                message =>
                 {
-                    if (content is ConsensusProposalMsg)
+                    if (message.Content is ConsensusProposalMsg)
                     {
                         received2 = true;
                         receivedEvent.Set();
@@ -134,8 +134,8 @@ namespace Libplanet.Net.Tests.Consensus
                 _ = gossip2.StartAsync(default);
                 await gossip1.WaitForRunningAsync();
                 await gossip2.WaitForRunningAsync();
-                gossip1.AddMessage(
-                    TestUtils.CreateConsensusPropose(fx.Block1, new PrivateKey(), 0));
+                gossip1.AddMessage(TestUtils.MakeMessage(
+                    TestUtils.CreateConsensusPropose(fx.Block1, new PrivateKey(), 0)));
                 await receivedEvent.WaitAsync();
                 Assert.True(received1);
                 Assert.True(received2);
@@ -159,9 +159,9 @@ namespace Libplanet.Net.Tests.Consensus
             var key2 = new PrivateKey();
             var receivedEvent = new AsyncAutoResetEvent();
             var gossip1 = CreateGossip(
-                content =>
+                message =>
                 {
-                    if (content is ConsensusProposalMsg)
+                    if (message.Content is ConsensusProposalMsg)
                     {
                         received1++;
                     }
@@ -170,9 +170,9 @@ namespace Libplanet.Net.Tests.Consensus
                 6001,
                 new[] { new BoundPeer(key2.PublicKey, new DnsEndPoint("127.0.0.1", 6002)) });
             var gossip2 = CreateGossip(
-                content =>
+                message =>
                 {
-                    if (content is ConsensusProposalMsg)
+                    if (message.Content is ConsensusProposalMsg)
                     {
                         received2++;
                     }
@@ -195,10 +195,10 @@ namespace Libplanet.Net.Tests.Consensus
                 gossip1.AddMessages(
                     new[]
                     {
-                        TestUtils.CreateConsensusPropose(fx.Block1, key, 0),
-                        TestUtils.CreateConsensusPropose(fx.Block1, key, 1),
-                        TestUtils.CreateConsensusPropose(fx.Block1, key, 2),
-                        TestUtils.CreateConsensusPropose(fx.Block1, key, 3),
+                        TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(fx.Block1, key, 0)),
+                        TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(fx.Block1, key, 1)),
+                        TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(fx.Block1, key, 2)),
+                        TestUtils.MakeMessage(TestUtils.CreateConsensusPropose(fx.Block1, key, 3)),
                     });
 
                 await receivedEvent.WaitAsync();
@@ -288,7 +288,7 @@ namespace Libplanet.Net.Tests.Consensus
                 _ = gossip.StartAsync(default);
                 await seed.WaitForRunningAsync();
                 await gossip.WaitForRunningAsync();
-                gossip.AddMessage(new PingMsg());
+                gossip.AddMessage(TestUtils.MakeMessage(new PingMsg()));
 
                 // Wait heartbeat interval * 2.
                 await Task.Delay(2 * 1000);
@@ -360,7 +360,7 @@ namespace Libplanet.Net.Tests.Consensus
         }
 
         private Gossip CreateGossip(
-            Action<MessageContent> processMessage,
+            Action<Message> processMessage,
             PrivateKey? privateKey = null,
             int? port = null,
             IEnumerable<BoundPeer>? peers = null,

@@ -215,44 +215,49 @@ namespace Libplanet.Net.Consensus
         /// <see cref="Context"/> or discarding it.
         /// </para>
         /// <para>
-        /// In particular, this discards <paramref name="consensusMessage"/> with
+        /// In particular, this discards <paramref name="message"/> with
         /// <see cref="ConsensusMsg.Height"/> less than <see cref="Height"/>.  Otherwise,
-        /// given <paramref name="consensusMessage"/> is passed on to a <see cref="Context"/>
+        /// given <paramref name="message"/> is passed on to a <see cref="Context"/>
         /// with <see cref="Context.Height"/> the same as <see cref="ConsensusMsg.Height"/> of
-        /// <paramref name="consensusMessage"/>.  If there is no such <see cref="Context"/>,
+        /// <paramref name="message"/>.  If there is no such <see cref="Context"/>,
         /// then a new <see cref="Context"/> is created for the dispatch.
         /// </para>
         /// </summary>
-        /// <param name="consensusMessage">The <see cref="ConsensusMsg"/> received from
+        /// <param name="message">The <see cref="Message"/> received from
         /// any validator.
         /// </param>
         /// <returns>
-        /// <see langword="true"/> if <paramref name="consensusMessage"/> is dispatched to
+        /// <see langword="true"/> if <paramref name="message"/> is dispatched to
         /// a <see cref="Context"/>, <see langword="false"/> otherwise.
         /// </returns>
-        public bool HandleMessage(ConsensusMsg consensusMessage)
+        public bool HandleMessage(Message message)
         {
-            long height = consensusMessage.Height;
-            if (height < Height)
+            if (message.Content is ConsensusMsg consensusMessage)
             {
-                _logger.Debug(
-                    "Discarding a received message as its height #{MessageHeight} " +
-                    "is lower than the current context's height #{ContextHeight}",
-                    height,
-                    Height);
-                return false;
-            }
-
-            lock (_contextLock)
-            {
-                if (!_contexts.ContainsKey(height))
+                long height = consensusMessage.Height;
+                if (height < Height)
                 {
-                    _contexts[height] = CreateContext(height);
+                    _logger.Debug(
+                        "Discarding a received message as its height #{MessageHeight} " +
+                        "is lower than the current context's height #{ContextHeight}",
+                        height,
+                        Height);
+                    return false;
                 }
 
-                _contexts[height].ProduceMessage(consensusMessage);
-                return true;
+                lock (_contextLock)
+                {
+                    if (!_contexts.ContainsKey(height))
+                    {
+                        _contexts[height] = CreateContext(height);
+                    }
+
+                    _contexts[height].ProduceMessage(message);
+                    return true;
+                }
             }
+
+            return false;
         }
 
         /// <summary>

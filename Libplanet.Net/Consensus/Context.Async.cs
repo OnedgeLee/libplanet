@@ -96,7 +96,7 @@ namespace Libplanet.Net.Consensus
         /// Adds <paramref name="message"/> to the message queue.
         /// </summary>
         /// <param name="message">A <see cref="ConsensusMsg"/> to be processed.</param>
-        internal void ProduceMessage(ConsensusMsg message)
+        internal void ProduceMessage(Message message)
         {
             _messageRequests.Writer.WriteAsync(message);
         }
@@ -112,16 +112,20 @@ namespace Libplanet.Net.Consensus
 
         private async Task ConsumeMessage(CancellationToken cancellationToken)
         {
-            ConsensusMsg message = await _messageRequests.Reader.ReadAsync(cancellationToken);
-            ProduceMutation(() =>
-            {
-                if (AddMessage(message))
-                {
-                    ProcessHeightOrRoundUponRules(message);
-                }
-            });
+            Message message = await _messageRequests.Reader.ReadAsync(cancellationToken);
 
-            MessageConsumed?.Invoke(this, message);
+            if (message.Content is ConsensusMsg consensusMsg)
+            {
+                ProduceMutation(() =>
+                {
+                    if (AddMessage(consensusMsg, message.Remote.PublicKey))
+                    {
+                        ProcessHeightOrRoundUponRules(consensusMsg);
+                    }
+                });
+
+                MessageConsumed?.Invoke(this, consensusMsg);
+            }
         }
 
         private async Task ConsumeMutation(CancellationToken cancellationToken)

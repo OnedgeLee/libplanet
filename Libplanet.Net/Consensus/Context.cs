@@ -83,7 +83,7 @@ namespace Libplanet.Net.Consensus
         private readonly BlockChain _blockChain;
         private readonly Codec _codec;
         private readonly ValidatorSet _validatorSet;
-        private readonly Channel<ConsensusMsg> _messageRequests;
+        private readonly Channel<Message> _messageRequests;
         private readonly Channel<System.Action> _mutationRequests;
         private readonly HeightVoteSet _heightVoteSet;
         private readonly PrivateKey _privateKey;
@@ -183,7 +183,7 @@ namespace Libplanet.Net.Consensus
             _peerCatchupRounds = new Dictionary<PublicKey, List<int>>();
             _blockChain = blockChain;
             _codec = new Codec();
-            _messageRequests = Channel.CreateUnbounded<ConsensusMsg>();
+            _messageRequests = Channel.CreateUnbounded<Message>();
             _mutationRequests = Channel.CreateUnbounded<System.Action>();
             _heightVoteSet = new HeightVoteSet(height, validators);
             _preVoteTimeoutFlags = new HashSet<int>();

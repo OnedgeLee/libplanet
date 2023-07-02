@@ -285,6 +285,20 @@ namespace Libplanet.Net.Transports
         public Task WaitForRunningAsync() => _runningEvent.WaitAsync();
 
         /// <inheritdoc/>
+        public Message MakeMessage(MessageContent content)
+        {
+            NetMQMessage raw = _messageCodec.Encode(
+                content,
+                _privateKey,
+                _appProtocolVersionOptions.AppProtocolVersion,
+                AsPeer,
+                DateTimeOffset.UtcNow
+            );
+
+            return _messageCodec.Decode(raw, true);
+        }
+
+        /// <inheritdoc/>
         public async Task<Message> SendMessageAsync(
             BoundPeer peer,
             MessageContent content,

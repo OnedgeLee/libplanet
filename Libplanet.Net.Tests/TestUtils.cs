@@ -131,7 +131,7 @@ namespace Libplanet.Net.Tests
                     continue;
                 }
 
-                consensusContext.HandleMessage(
+                consensusContext.HandleMessage(MakeMessage(
                     new ConsensusPreCommitMsg(
                         new VoteMetadata(
                             consensusContext.Height,
@@ -139,7 +139,7 @@ namespace Libplanet.Net.Tests
                             roundBlockHash,
                             DateTimeOffset.UtcNow,
                             privateKey.PublicKey,
-                            VoteFlag.PreCommit).Sign(privateKey)));
+                            VoteFlag.PreCommit).Sign(privateKey))));
             }
         }
 
@@ -156,7 +156,7 @@ namespace Libplanet.Net.Tests
                     continue;
                 }
 
-                context.ProduceMessage(
+                context.ProduceMessage(MakeMessage(
                     new ConsensusPreCommitMsg(
                         new VoteMetadata(
                             context.Height,
@@ -164,7 +164,7 @@ namespace Libplanet.Net.Tests
                             roundBlockHash,
                             DateTimeOffset.UtcNow,
                             privateKey.PublicKey,
-                            VoteFlag.PreCommit).Sign(privateKey)));
+                            VoteFlag.PreCommit).Sign(privateKey))));
             }
         }
 
@@ -181,7 +181,7 @@ namespace Libplanet.Net.Tests
                     continue;
                 }
 
-                context.ProduceMessage(
+                context.ProduceMessage(MakeMessage(
                     new ConsensusPreVoteMsg(
                         new VoteMetadata(
                             context.Height,
@@ -189,7 +189,7 @@ namespace Libplanet.Net.Tests
                             roundBlockHash,
                             DateTimeOffset.UtcNow,
                             privateKey.PublicKey,
-                            VoteFlag.PreVote).Sign(privateKey)));
+                            VoteFlag.PreVote).Sign(privateKey))));
             }
         }
 
@@ -205,7 +205,7 @@ namespace Libplanet.Net.Tests
                     continue;
                 }
 
-                consensusContext.HandleMessage(
+                consensusContext.HandleMessage(MakeMessage(
                     new ConsensusPreVoteMsg(
                         new VoteMetadata(
                             consensusContext.Height,
@@ -213,7 +213,7 @@ namespace Libplanet.Net.Tests
                             roundBlockHash,
                             DateTimeOffset.UtcNow,
                             privateKey.PublicKey,
-                            VoteFlag.PreVote).Sign(privateKey)));
+                            VoteFlag.PreVote).Sign(privateKey))));
             }
         }
 
@@ -235,7 +235,7 @@ namespace Libplanet.Net.Tests
                 Task.Run(() =>
                 {
                     // ReSharper disable once AccessToModifiedClosure
-                    consensusContext!.HandleMessage(message);
+                    consensusContext!.HandleMessage(MakeMessage(message));
                 });
 
             consensusContext = new ConsensusContext(
@@ -263,7 +263,7 @@ namespace Libplanet.Net.Tests
             void BroadcastMessage(ConsensusMsg message) =>
                 Task.Run(() =>
                 {
-                    context!.ProduceMessage(message);
+                    context!.ProduceMessage(MakeMessage(message));
                 });
 
             var (blockChain, consensusContext) = CreateDummyConsensusContext(
@@ -318,6 +318,18 @@ namespace Libplanet.Net.Tests
             Random.NextBytes(bytes);
 
             return bytes;
+        }
+
+        public static Message MakeMessage(MessageContent content)
+        {
+            return new Message(
+                content,
+                AppProtocolVersion,
+                new BoundPeer(
+                    PrivateKeys[0].PublicKey,
+                    new DnsEndPoint("127.0.0.1", 1234)),
+                DateTimeOffset.UtcNow,
+                PrivateKeys[0].ToAddress().ByteArray.Concat(new byte[10]).ToArray());
         }
 
         public class DummyConsensusMessageHandler : IConsensusMessageCommunicator

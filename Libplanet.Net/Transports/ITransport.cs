@@ -170,5 +170,13 @@ namespace Libplanet.Net.Transports
             MessageContent content,
             byte[] identity,
             CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Make <see cref="Message"/> from given <paramref name="content"/>.
+        /// </summary>
+        /// <param name="content"><see cref="MessageContent"/> to make <see cref="Message"/>.
+        /// </param>
+        /// <returns><see cref="Message"/> made from <paramref name="content"/>.</returns>
+        Message MakeMessage(MessageContent content);
     }
 }

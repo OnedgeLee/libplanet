@@ -150,13 +150,13 @@ namespace Libplanet.Net.Consensus
         /// <summary>
         /// A handler for received <see cref="Message"/>s.
         /// </summary>
-        /// <param name="content">A message to process.</param>
-        private void ProcessMessage(MessageContent content)
+        /// <param name="message">A message to process.</param>
+        private void ProcessMessage(Message message)
         {
-            switch (content)
+            switch (message.Content)
             {
                 case ConsensusMsg consensusMsg:
-                    _consensusContext.HandleMessage(consensusMsg);
+                    _consensusContext.HandleMessage(message);
                     break;
             }
         }

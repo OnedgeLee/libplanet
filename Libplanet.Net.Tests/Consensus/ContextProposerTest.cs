@@ -54,15 +54,18 @@ namespace Libplanet.Net.Tests.Consensus
             };
 
             context.Start();
-            context.ProduceMessage(
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(TestUtils.CreateVote(
-                    TestUtils.PrivateKeys[0], 1, hash: default, flag: VoteFlag.PreVote)));
-            context.ProduceMessage(
+                    TestUtils.PrivateKeys[0], 1, hash: default, flag: VoteFlag.PreVote
+                    ))));
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(TestUtils.CreateVote(
-                    TestUtils.PrivateKeys[2], 1, hash: default, flag: VoteFlag.PreVote)));
-            context.ProduceMessage(
+                    TestUtils.PrivateKeys[2], 1, hash: default, flag: VoteFlag.PreVote
+                    ))));
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(TestUtils.CreateVote(
-                    TestUtils.PrivateKeys[3], 1, hash: default, flag: VoteFlag.PreVote)));
+                    TestUtils.PrivateKeys[3], 1, hash: default, flag: VoteFlag.PreVote
+                    ))));
 
             await Task.WhenAll(preCommitSent.WaitAsync(), stepChangedToPreCommit.WaitAsync());
             Assert.Equal(default(BlockHash), preCommit?.BlockHash);
@@ -108,24 +111,24 @@ namespace Libplanet.Net.Tests.Consensus
             await proposalSent.WaitAsync();
             Assert.NotNull(proposal?.BlockHash);
 
-            context.ProduceMessage(
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(TestUtils.CreateVote(
                     TestUtils.PrivateKeys[0],
                     1,
                     hash: proposal.BlockHash,
-                    flag: VoteFlag.PreVote)));
-            context.ProduceMessage(
+                    flag: VoteFlag.PreVote))));
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(TestUtils.CreateVote(
                     TestUtils.PrivateKeys[2],
                     1,
                     hash: proposal.BlockHash,
-                    flag: VoteFlag.PreVote)));
-            context.ProduceMessage(
+                    flag: VoteFlag.PreVote))));
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreVoteMsg(TestUtils.CreateVote(
                     TestUtils.PrivateKeys[3],
                     1,
                     hash: proposal.BlockHash,
-                    flag: VoteFlag.PreVote)));
+                    flag: VoteFlag.PreVote))));
 
             await Task.WhenAll(preCommitSent.WaitAsync(), stepChangedToPreCommit.WaitAsync());
             Assert.Equal(proposal?.BlockHash, preCommit?.BlockHash);
@@ -149,18 +152,18 @@ namespace Libplanet.Net.Tests.Consensus
             };
 
             context.Start();
-            context.ProduceMessage(
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreCommitMsg(
                     TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[0], 1, hash: default, flag: VoteFlag.PreCommit)));
-            context.ProduceMessage(
+                        TestUtils.PrivateKeys[0], 1, hash: default, flag: VoteFlag.PreCommit))));
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreCommitMsg(
                     TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[2], 1, hash: default, flag: VoteFlag.PreCommit)));
-            context.ProduceMessage(
+                        TestUtils.PrivateKeys[2], 1, hash: default, flag: VoteFlag.PreCommit))));
+            context.ProduceMessage(TestUtils.MakeMessage(
                 new ConsensusPreCommitMsg(
                     TestUtils.CreateVote(
-                        TestUtils.PrivateKeys[3], 1, hash: default, flag: VoteFlag.PreCommit)));
+                        TestUtils.PrivateKeys[3], 1, hash: default, flag: VoteFlag.PreCommit))));
 
             await roundChangedToOne.WaitAsync();
             Assert.Equal(1, context.Height);

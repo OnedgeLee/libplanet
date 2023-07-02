@@ -166,6 +166,16 @@ namespace Libplanet.Net.Tests.Protocols
         /// <inheritdoc cref="ITransport.WaitForRunningAsync"/>
         public Task WaitForRunningAsync() => _runningEvent.Task;
 
+        public Message MakeMessage(MessageContent content)
+        {
+            return new Message(
+                content,
+                AppProtocolVersion,
+                AsPeer,
+                DateTimeOffset.UtcNow,
+                _privateKey.ToAddress().ByteArray.Concat(new byte[10]).ToArray());
+        }
+
 #pragma warning disable S4457 // Cannot split the method since method is in interface
         public async Task BootstrapAsync(
             IEnumerable<BoundPeer> bootstrapPeers,

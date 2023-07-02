@@ -88,12 +88,18 @@ namespace Libplanet.Net.Tests.Consensus
             await proposalMessageSent.WaitAsync();
             Assert.NotNull(proposal?.BlockHash);
 
-            consensusContext.HandleMessage(new ConsensusPreCommitMsg(TestUtils.CreateVote(
-                TestUtils.PrivateKeys[0], 3, hash: proposal.BlockHash, flag: VoteFlag.PreCommit)));
-            consensusContext.HandleMessage(new ConsensusPreCommitMsg(TestUtils.CreateVote(
-                TestUtils.PrivateKeys[1], 3, hash: proposal.BlockHash, flag: VoteFlag.PreCommit)));
-            consensusContext.HandleMessage(new ConsensusPreCommitMsg(TestUtils.CreateVote(
-                TestUtils.PrivateKeys[2], 3, hash: proposal.BlockHash, flag: VoteFlag.PreCommit)));
+            consensusContext.HandleMessage(TestUtils.MakeMessage(new ConsensusPreCommitMsg(
+                TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[0], 3, hash: proposal.BlockHash, flag: VoteFlag.PreCommit
+                    ))));
+            consensusContext.HandleMessage(TestUtils.MakeMessage(new ConsensusPreCommitMsg(
+                TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[1], 3, hash: proposal.BlockHash, flag: VoteFlag.PreCommit
+                    ))));
+            consensusContext.HandleMessage(TestUtils.MakeMessage(new ConsensusPreCommitMsg(
+                TestUtils.CreateVote(
+                    TestUtils.PrivateKeys[2], 3, hash: proposal.BlockHash, flag: VoteFlag.PreCommit
+                    ))));
 
             // Waiting for commit.
             await heightThreeStepChangedToEndCommit.WaitAsync();
@@ -144,11 +150,11 @@ namespace Libplanet.Net.Tests.Consensus
 
             consensusContext.NewHeight(blockChain.Tip.Index + 1);
             Assert.True(consensusContext.Height == 1);
-            Assert.False(consensusContext.HandleMessage(
+            Assert.False(consensusContext.HandleMessage(TestUtils.MakeMessage(
                 TestUtils.CreateConsensusPropose(
                     blockChain.ProposeBlock(TestUtils.PrivateKeys[0]),
                     TestUtils.PrivateKeys[0],
-                    0)));
+                    0))));
         }
 
         [Fact(Timeout = Timeout)]
@@ -162,12 +168,12 @@ namespace Libplanet.Net.Tests.Consensus
             // Create context of index 1.
             consensusContext.NewHeight(1);
             // Create context of index 2.
-            consensusContext.HandleMessage(
+            consensusContext.HandleMessage(TestUtils.MakeMessage(
                 TestUtils.CreateConsensusPropose(
                     blockChain.ProposeBlock(TestUtils.PrivateKeys[2]),
                     TestUtils.PrivateKeys[2],
                     2,
-                    1));
+                    1)));
 
             var block = blockChain.ProposeBlock(new PrivateKey());
             blockChain.Append(block, TestUtils.CreateBlockCommit(block));
@@ -233,7 +239,8 @@ namespace Libplanet.Net.Tests.Consensus
 
             foreach (var vote in votes)
             {
-                consensusContext.HandleMessage(new ConsensusPreCommitMsg(vote));
+                consensusContext.HandleMessage(TestUtils.MakeMessage(
+                    new ConsensusPreCommitMsg(vote)));
             }
 
             await heightOneEndCommit.WaitAsync();
