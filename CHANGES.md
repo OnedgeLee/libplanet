@@ -40,6 +40,13 @@ To be released.
     `Context`.  [[#3260]]
  -  (Libplanet.Net) Renamed `Context.BroadcastMessage(ConsensusMsg)`
     as `Context.PublishMessage(ConsensusMsg)`.  [[#3260]]
+ -  (Libplanet.Net) `ConsensusContext.HandleMessage()` now receives
+    `Message` instead of `ConsensusMsg`.  [[#3260]]
+ -  (Libplanet.Net) `Gossip.AddMessage()` now receives
+    `Message` instead of `MessageContent`.  [[#3260]]
+ -  (Libplanet.Net) Type of `Gossip` constructor parameter `processMessage`.
+    has been changed to `Action<Message>` from `Action<MessageContent>`
+    [[#3260]]
 
 ### Backward-incompatible network protocol changes
 
@@ -87,6 +94,8 @@ To be released.
  -  (Libplanet.Net) Added `Gossip.AllowPeer(BoundPeer)` method.  [[#3260]]
  -  (Libplanet.Net) Added `Gossip.ClearCache()` method.  [[#3260]]
  -  (Libplanet.Net) Added `Gossip.ClearDenySet(BoundPeer)` method.  [[#3260]]
+ -  (Libplanet.Net) Added `ITransport.MakeMessage(MessageContent)`
+    abstract method.  [[#3260]]
 
 ### Behavioral changes
 
