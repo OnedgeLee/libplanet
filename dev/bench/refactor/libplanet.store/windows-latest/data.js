@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1689325227056,
+  "lastUpdate": 1689325572707,
   "repoUrl": "https://github.com/OnedgeLee/libplanet",
   "entries": {
     "Benchmark.Net Benchmark": [
@@ -2376,6 +2376,222 @@ window.BENCHMARK_DATA = {
             "value": 14242.307692307691,
             "unit": "ns",
             "range": "± 1244.296389239117"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ilgyu@planetariumhq.com",
+            "name": "ilgyu",
+            "username": "OnedgeLee"
+          },
+          "committer": {
+            "email": "ilgyu@planetariumhq.com",
+            "name": "ilgyu",
+            "username": "OnedgeLee"
+          },
+          "distinct": true,
+          "id": "fee9e292264be5ee4d81ab25cd5584bcdabda1f6",
+          "message": "document: Update changelog / ci",
+          "timestamp": "2023-07-14T17:49:42+09:00",
+          "tree_id": "90aa36b0a64cd978722f7cd0ae29f622eb42dadb",
+          "url": "https://github.com/OnedgeLee/libplanet/commit/fee9e292264be5ee4d81ab25cd5584bcdabda1f6"
+        },
+        "date": 1689325535305,
+        "tool": "benchmarkdotnet",
+        "benches": [
+          {
+            "name": "Libplanet.Benchmarks.AppendBlock.AppendBlockOneTransactionNoAction",
+            "value": 1456677.4193548388,
+            "unit": "ns",
+            "range": "± 101122.69251307526"
+          },
+          {
+            "name": "Libplanet.Benchmarks.AppendBlock.AppendBlockTenTransactionsNoAction",
+            "value": 2725442.2535211267,
+            "unit": "ns",
+            "range": "± 132270.57513399443"
+          },
+          {
+            "name": "Libplanet.Benchmarks.AppendBlock.AppendBlockOneTransactionWithActions",
+            "value": 1864886.5979381443,
+            "unit": "ns",
+            "range": "± 123948.64748897859"
+          },
+          {
+            "name": "Libplanet.Benchmarks.AppendBlock.AppendBlockTenTransactionsWithActions",
+            "value": 4811333.333333333,
+            "unit": "ns",
+            "range": "± 122510.37814660107"
+          },
+          {
+            "name": "Libplanet.Benchmarks.BlockChain.ContainsBlock",
+            "value": 52212.5,
+            "unit": "ns",
+            "range": "± 4581.478731634695"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Commit.DecodeBlockCommit(ValidatorSize: 4)",
+            "value": 7840080,
+            "unit": "ns",
+            "range": "± 174957.03412402052"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Commit.DecodeBlockCommit(ValidatorSize: 10)",
+            "value": 21013835.714285713,
+            "unit": "ns",
+            "range": "± 319434.68059187813"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Commit.DecodeBlockCommit(ValidatorSize: 25)",
+            "value": 52812492.85714286,
+            "unit": "ns",
+            "range": "± 408051.23634602124"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Commit.DecodeBlockCommit(ValidatorSize: 50)",
+            "value": 106552613.33333333,
+            "unit": "ns",
+            "range": "± 1147048.0341584072"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Commit.DecodeBlockCommit(ValidatorSize: 100)",
+            "value": 210729413.33333334,
+            "unit": "ns",
+            "range": "± 1219829.7245732213"
+          },
+          {
+            "name": "Libplanet.Benchmarks.DataModel.DataModelBenchmark.EncodeRootModel",
+            "value": 4912670.535714285,
+            "unit": "ns",
+            "range": "± 15747.034730385622"
+          },
+          {
+            "name": "Libplanet.Benchmarks.DataModel.DataModelBenchmark.EncodeLeafModel",
+            "value": 1571887.6953125,
+            "unit": "ns",
+            "range": "± 6008.9594600485225"
+          },
+          {
+            "name": "Libplanet.Benchmarks.DataModel.DataModelBenchmark.EncodeRawLeafModel",
+            "value": 1217454.1536458333,
+            "unit": "ns",
+            "range": "± 6030.20922530638"
+          },
+          {
+            "name": "Libplanet.Benchmarks.DataModel.DataModelBenchmark.DecodeRootModel",
+            "value": 2716741.5625,
+            "unit": "ns",
+            "range": "± 10888.014870273193"
+          },
+          {
+            "name": "Libplanet.Benchmarks.DataModel.DataModelBenchmark.DecodeLeafModel",
+            "value": 866991.9642857143,
+            "unit": "ns",
+            "range": "± 2482.732744212568"
+          },
+          {
+            "name": "Libplanet.Benchmarks.DataModel.DataModelBenchmark.DecodeRawLeafModel",
+            "value": 783600.5789620535,
+            "unit": "ns",
+            "range": "± 1323.3484444681271"
+          },
+          {
+            "name": "Libplanet.Benchmarks.ProposeBlock.ProposeBlockEmpty",
+            "value": 3455566.6666666665,
+            "unit": "ns",
+            "range": "± 36912.18665711263"
+          },
+          {
+            "name": "Libplanet.Benchmarks.ProposeBlock.ProposeBlockOneTransactionNoAction",
+            "value": 3626497.0588235296,
+            "unit": "ns",
+            "range": "± 115190.93368494135"
+          },
+          {
+            "name": "Libplanet.Benchmarks.ProposeBlock.ProposeBlockTenTransactionsNoAction",
+            "value": 4386666.666666667,
+            "unit": "ns",
+            "range": "± 101493.71080679497"
+          },
+          {
+            "name": "Libplanet.Benchmarks.ProposeBlock.ProposeBlockOneTransactionWithActions",
+            "value": 4042455.882352941,
+            "unit": "ns",
+            "range": "± 129849.13668439505"
+          },
+          {
+            "name": "Libplanet.Benchmarks.ProposeBlock.ProposeBlockTenTransactionsWithActions",
+            "value": 6384375,
+            "unit": "ns",
+            "range": "± 207718.5023397909"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.PutFirstEmptyBlock",
+            "value": 270933.3333333333,
+            "unit": "ns",
+            "range": "± 9854.048732514175"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.PutFirstBlockWithTxs",
+            "value": 250558.49056603774,
+            "unit": "ns",
+            "range": "± 9559.136466516535"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.PutBlockOnManyBlocks",
+            "value": 245575.75757575757,
+            "unit": "ns",
+            "range": "± 14677.492771692301"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.GetOldBlockOutOfManyBlocks",
+            "value": 4188389.4736842103,
+            "unit": "ns",
+            "range": "± 91752.49251677547"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.GetRecentBlockOutOfManyBlocks",
+            "value": 3734262.5,
+            "unit": "ns",
+            "range": "± 93674.22415872538"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.TryGetNonExistentBlockHash",
+            "value": 20087.755102040817,
+            "unit": "ns",
+            "range": "± 2319.9833498390453"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.PutFirstTx",
+            "value": 91411.11111111111,
+            "unit": "ns",
+            "range": "± 8123.748115661393"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.PutTxOnManyTxs",
+            "value": 79925.80645161291,
+            "unit": "ns",
+            "range": "± 6519.317502719306"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.GetOldTxOutOfManyTxs",
+            "value": 96875.51020408163,
+            "unit": "ns",
+            "range": "± 14024.257785638394"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.GetRecentTxOutOfManyTxs",
+            "value": 6009.278350515464,
+            "unit": "ns",
+            "range": "± 948.362895800223"
+          },
+          {
+            "name": "Libplanet.Benchmarks.Store.TryGetNonExistentTxId",
+            "value": 17990.425531914894,
+            "unit": "ns",
+            "range": "± 1542.6077034207174"
           }
         ]
       }
