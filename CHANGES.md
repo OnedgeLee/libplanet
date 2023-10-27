@@ -26,6 +26,11 @@ To be released.
 
 ### Dependencies
 
+ -  Upgrade *Bencodex* from [0.14.0][Bencodex 0.14.0] to
+    [0.16.0][Bencodex 0.16.0].  [[#3335]]
+ -  Upgrade *Bencodex.Json* from [0.11.0][Bencodex.Json 0.11.0] to
+    [0.16.0][Bencodex.Json 0.16.0].  [[#3106]]
+
 ### CLI tools
 
 [#3454]: https://github.com/planetarium/libplanet/pull/3454
