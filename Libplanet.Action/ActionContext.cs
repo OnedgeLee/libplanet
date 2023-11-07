@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.Contracts;
 using System.Threading;
 using Libplanet.Action.State;
 using Libplanet.Crypto;
@@ -17,6 +16,9 @@ namespace Libplanet.Action
             Address signer,
             TxId? txid,
             Address miner,
+            Address legacyAccount,
+            Address validatorSetAccount,
+            Address gasAccount,
             long blockIndex,
             int blockProtocolVersion,
             IWorld previousState,
@@ -27,6 +29,9 @@ namespace Libplanet.Action
             Signer = signer;
             TxId = txid;
             Miner = miner;
+            LegacyAccount = legacyAccount;
+            ValidatorSetAccount = validatorSetAccount;
+            GasAccount = gasAccount;
             BlockIndex = blockIndex;
             BlockProtocolVersion = blockProtocolVersion;
             Rehearsal = rehearsal;
@@ -45,6 +50,15 @@ namespace Libplanet.Action
 
         /// <inheritdoc cref="IActionContext.Miner"/>
         public Address Miner { get; }
+
+        /// <inheritdoc cref="IActionContext.LegacyAccount"/>
+        public Address LegacyAccount { get; }
+
+        /// <inheritdoc cref="IActionContext.ValidatorSetAccount"/>
+        public Address ValidatorSetAccount { get; }
+
+        /// <inheritdoc cref="IActionContext.GasAccount"/>
+        public Address GasAccount { get; }
 
         /// <inheritdoc cref="IActionContext.BlockIndex"/>
         public long BlockIndex { get; }

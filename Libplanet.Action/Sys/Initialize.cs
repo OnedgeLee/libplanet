@@ -81,7 +81,7 @@ namespace Libplanet.Action.Sys
 
             if (ValidatorSet is { } vs)
             {
-                IAccount account = world.GetValidatorSetAccount();
+                IAccount account = world.GetAccount(context.ValidatorSetAccount);
 
                 foreach (Validator v in vs.Validators)
                 {

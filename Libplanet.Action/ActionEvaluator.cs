@@ -25,6 +25,7 @@ namespace Libplanet.Action
     {
         private readonly ILogger _logger;
         private readonly PolicyBlockActionGetter _policyBlockActionGetter;
+        private readonly ReservedAddresses _reservedAddresses;
         private readonly IStateStore _stateStore;
         private readonly IActionLoader _actionLoader;
 
@@ -39,12 +40,14 @@ namespace Libplanet.Action
         /// action type lookup.</param>
         public ActionEvaluator(
             PolicyBlockActionGetter policyBlockActionGetter,
+            ReservedAddresses reservedAddresses,
             IStateStore stateStore,
             IActionLoader actionTypeLoader)
         {
             _logger = Log.ForContext<ActionEvaluator>()
                 .ForContext("Source", nameof(ActionEvaluator));
             _policyBlockActionGetter = policyBlockActionGetter;
+            _reservedAddresses = reservedAddresses;
             _stateStore = stateStore;
             _actionLoader = actionTypeLoader;
         }
@@ -168,6 +171,7 @@ namespace Libplanet.Action
         internal static IEnumerable<ActionEvaluation> EvaluateActions(
             IPreEvaluationBlockHeader blockHeader,
             ITransaction? tx,
+            ReservedAddresses reservedAddresses,
             IWorld previousState,
             IImmutableList<IAction> actions,
             ILogger? logger = null)
@@ -183,6 +187,7 @@ namespace Libplanet.Action
                     miner: blockHeader.Miner,
                     blockIndex: blockHeader.Index,
                     blockProtocolVersion: blockHeader.ProtocolVersion,
+                    reservedAddresses: reservedAddresses,
                     previousState: prevState,
                     randomSeed: randomSeed,
                     gasLimit: actionGasLimit);

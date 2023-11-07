@@ -38,6 +38,27 @@ namespace Libplanet.Action
         Address Miner { get; }
 
         /// <summary>
+        /// The <see cref="Address"/> of the <see cref="IAccount"/> that contains
+        /// the legacy states.
+        /// </summary>
+        [Pure]
+        Address LegacyAccount { get; }
+
+        /// <summary>
+        /// The <see cref="Address"/> of the <see cref="IAccount"/> that contains
+        /// the <see cref="Types.Consensus.ValidatorSet"/>.
+        /// </summary>
+        [Pure]
+        Address ValidatorSetAccount { get; }
+
+        /// <summary>
+        /// The <see cref="Address"/> of the <see cref="IAccount"/> that contains
+        /// the <see cref="Types.Assets.FungibleAssetValue"/>es of gas.
+        /// </summary>
+        [Pure]
+        Address GasAccount { get; }
+
+        /// <summary>
         /// The <see cref="Block.Index"/> of the <see cref="Block"/> that contains
         /// the <see cref="IAction"/>.
         /// </summary>

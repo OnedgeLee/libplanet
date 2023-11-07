@@ -1,16 +1,31 @@
 using Libplanet.Crypto;
+using Libplanet.Types.Blocks;
 
 namespace Libplanet.Action.State
 {
-    public static class ReservedAddresses
+    public class ReservedAddresses
     {
-        public static readonly Address LegacyAccount
-            = new Address("1000000000000000000000000000000000000000");
+        private readonly PolicyAccountAddressGetter _legacyAccountGetter;
+        private readonly PolicyAccountAddressGetter _validatorSetAccountGetter;
+        private readonly PolicyAccountAddressGetter _gasAccountGetter;
 
-        public static readonly Address FungibleAssetsAccount
-            = new Address("1000000000000000000000000000000000000001");
+        public ReservedAddresses(
+            PolicyAccountAddressGetter legacyAccountGetter,
+            PolicyAccountAddressGetter validatorSetAccountGetter,
+            PolicyAccountAddressGetter gasAccountGetter)
+        {
+            _legacyAccountGetter = legacyAccountGetter;
+            _validatorSetAccountGetter = validatorSetAccountGetter;
+            _gasAccountGetter = gasAccountGetter;
+        }
 
-        public static readonly Address ValidatorSetAddress
-            = new Address("1000000000000000000000000000000000000002");
+        public Address LegacyAccount(IPreEvaluationBlockHeader blockHeader)
+            => _legacyAccountGetter(blockHeader);
+
+        public Address ValidatorSetAccount(IPreEvaluationBlockHeader blockHeader)
+            => _validatorSetAccountGetter(blockHeader);
+
+        public Address GasAccount(IPreEvaluationBlockHeader blockHeader)
+            => _gasAccountGetter(blockHeader);
     }
 }
