@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
-using System.Security.Cryptography;
 using Bencodex.Types;
 using Libplanet.Action;
 using Libplanet.Action.Loader;
@@ -732,6 +731,7 @@ namespace Libplanet.Tests.Action
                 Assert.Equal(blockA.Index, context.BlockIndex);
                 Assert.Equal(txA.Signer, context.Signer);
                 Assert.False(context.BlockAction);
+                Assert.Equal((Integer)deltaA[i].Value, prevState.GetState(txA.Signer));
                 Assert.Equal(
                     (Integer)deltaA[i].Value,
                     prevState.GetAccount(ReservedAddresses.LegacyAccount).GetState(txA.Signer));

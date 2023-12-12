@@ -334,6 +334,15 @@ namespace Libplanet.Action
 
             state = feeCollector.Refund(state);
             state = feeCollector.Reward(state);
+            state = new Account(
+                new AccountState(stateStore.Commit(state.Trie)),
+                state.TotalUpdatedFungibleAssets);
+
+            if (!state.Trie.Recorded)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to record {nameof(IAccount)}'s {nameof(ITrie)}.");
+            }
 
             if (state.Legacy)
             {

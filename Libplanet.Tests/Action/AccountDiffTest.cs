@@ -73,6 +73,7 @@ namespace Libplanet.Tests.Action
             Assert.Empty(diff.TotalSupplyDiffs);
             Assert.Null(diff.ValidatorSetDiff);
 
+            // Setup initial state.
             IAccount targetAccount = new Account(new AccountState(targetTrie));
             PrivateKey signer = new PrivateKey();
             IActionContext context = CreateActionContext(signer.Address, targetTrie);
@@ -83,7 +84,6 @@ namespace Libplanet.Tests.Action
             targetTrie = stateStore.Commit(targetAccount.Trie);
 
             sourceTrie = targetTrie;
-
             IAccount sourceAccount = new Account(new AccountState(sourceTrie));
             sourceAccount = sourceAccount.SetState(addr2, new Text("Two_"));
             sourceAccount = sourceAccount.SetState(addr3, new Text("Three"));
